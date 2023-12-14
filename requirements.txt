@@ -1,0 +1,13 @@
+# requirements.txt
+
+psutil
+
+numpy
+pandas
+tables
+
+torch
+tensordict
+pytorch-lightning
+jsonargparse[signatures]>=4.18.0
+tensorboardX
