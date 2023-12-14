@@ -2,7 +2,6 @@ from typing import Any
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
-import warnings
 import psutil
 
 from models.weight_init import xavier_init
@@ -99,9 +98,12 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         initialization method, you can override this method in your subclass.
         """
         if not self.modules():
-            warnings.warn('No modules were found in the model. The weights will not be initialized.', stacklevel=2)
+            rank_zero_warn(
+                'No modules were found in the model. The weights will not be initialized.'
+                )
         for m in self.modules():
-            xavier_init(m)
+            if m.requires_grad:
+                xavier_init(m)
 
 
     def training_step(self, batch : Any, batch_ix : list[int]) -> torch.Tensor:
@@ -312,7 +314,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         if loss.isinf():
             raise ValueError(f'The {name} is infinite.')
         if loss < 0:
-            warnings.warn(f'The {name} is negative.', stacklevel=2)
+            rank_zero_warn(f'The {name} is negative.')
 
 
     def _get_inputs_and_outputs(self, batch : torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -376,7 +378,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         tuple[float, float]: 
             The current absolute and relative GPU memory usage.
         """
-        total, available = torch.cuda.mem_get_info()
+        available, total = torch.cuda.mem_get_info()
         return float(available), float(available) / float(total)
         
     
