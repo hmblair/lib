@@ -591,4 +591,4 @@ class MappingIterableDataset(IterableDataset):
 
     
     def __len__(self) -> int:
-        return math.ceil(self.group.num_rows() / self.batch_size)
+        return math.ceil(self.mapping.num_rows() / self.batch_size)
