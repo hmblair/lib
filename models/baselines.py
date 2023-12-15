@@ -2,6 +2,7 @@
 
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from sklearn.kernel_ridge import KernelRidge
 from sklearn.metrics import mean_absolute_error
 import xgboost as xgb
 
@@ -96,7 +97,7 @@ class XGBoost(SKLearnBase):
             )
         
 
-class KernelRidge(SKLearnBase):
+class KernelRidgeRegression(SKLearnBase):
     """
     A kernel ridge regression model.
 
