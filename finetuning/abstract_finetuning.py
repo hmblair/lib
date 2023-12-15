@@ -64,7 +64,9 @@ from pytorch_lightning.utilities.model_summary import summarize
 from abc import ABCMeta, abstractmethod
 class BaseFineTuningModel(BaseModel, metaclass = ABCMeta):
     """
-    Base class for fine-tuning pre-trained models. Inherits from BaseModel.
+    Base class for fine-tuning pre-trained models. Adds logic for freezing and
+    unfreezing the weights of the pre-trained model, as well as logic for 
+    wrapping the pre-trained model with a LoRA layer.
 
     Parameters:
     ----------
