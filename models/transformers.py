@@ -40,14 +40,12 @@ class BaseTransformer(nn.Module):
             self, 
             embed_dim : int,
             num_embeddings : int, 
-            lr_warmup_steps : int,
             *args, **kwargs
             ):
         super().__init__(*args, **kwargs)
 
-        # store the embedding dimension and the number of lr warmup steps
+        # store the embedding dimension
         self.embed_dim = embed_dim
-        self.lr_warmup_steps = lr_warmup_steps
 
         # embedding layer
         self.embedding = nn.Embedding(num_embeddings, embed_dim)
@@ -88,22 +86,6 @@ class BaseTransformer(nn.Module):
         x = x.long()
         x = self.embedding(x)
         return self._absolute_positional_encoding(x)
-
-
-    def _get_scheduler(self, optimizer: torch.optim.Optimizer) -> torch.optim.lr_scheduler._LRScheduler:
-        """
-        A learning rate warmup and decay scheduler for transformers.
-
-        Args:
-            optimizer (torch.optim.Optimizer): The optimizer.
-
-        Returns:
-            torch.optim.lr_scheduler._LRScheduler: The learning rate scheduler.
-        """
-        return LinearWarmupAndInverseSqrtDecayLR(
-            optimizer=optimizer,
-            warmup_steps=self.lr_warmup_steps,
-            )
 
 
 
@@ -158,7 +140,7 @@ class Transformer(BaseTransformer):
         The number of layers in the transformer encoder.
     norm_first (bool): 
         Whether to apply layer normalization before the self-attention and 
-        feedforward layers. Defaults to False. True will yield a PreLN 
+        feedforward layers. Defaults to False. True will yield a Pre-LN 
         Transformer, as described in 'On Layer Normalization in the Transformer 
         Architecture', found at https://arxiv.org/abs/2002.04745.
     *args: 
