@@ -1,8 +1,11 @@
 # weight_init.py
 
+import torch
 import torch.nn as nn
 import warnings
 from typing import Union
+import numpy as np
+from pytorch_lightning.utilities import rank_zero_warn
 
 def xavier_init(
         m : nn.Module, 
@@ -32,37 +35,29 @@ def xavier_init(
 
     # initialize the weights of the module
     if isinstance(m, (nn.BatchNorm2d, nn.GroupNorm, nn.LayerNorm)):
-        if verbose:
-            print('Initializing normalization layer')
         nn.init.constant_(m.weight, 1)
         nn.init.constant_(m.bias, 0)
-    elif isinstance(m, nn.Linear):
-        if verbose:
-            print('Initializing linear layer')
+    elif isinstance(m, (nn.Linear, nn.Conv2d, nn.Conv3d, nn.ConvTranspose2d, nn.ConvTranspose3d)):
         nn.init.xavier_uniform_(m.weight, gain)
         if m.bias is not None:
             nn.init.constant_(m.bias, 0)
     elif isinstance(m, nn.Conv2d):
-        if verbose:
-            print('Initializing convolutional layer')
         nn.init.xavier_uniform_(m.weight, gain)
         if m.bias is not None:
             nn.init.constant_(m.bias, 0)
     elif isinstance(m, nn.Embedding):
-        if verbose:
-            print('Initializing embedding layer')
         nn.init.xavier_uniform_(m.weight, gain)
         if m.padding_idx is not None:
             nn.init.constant_(m.weight[m.padding_idx], 0)
-    elif isinstance(m, (nn.RNN, nn.GRU, nn.LSTM)):
-        if verbose:
-            print('Initializing recurrent layer')
+    elif isinstance(m, (nn.RNN, nn.GRU, nn.LSTM, nn.LSTMCell, nn.GRUCell, nn.RNNCell, nn.Transformer, nn.TransformerEncoder, nn.TransformerDecoder)):
         for name, param in m.named_parameters():
-            if 'weight' in name:
+            if 'weight' in name and param.data.dim() == 2:
                 nn.init.xavier_uniform_(param, gain)
             elif 'bias' in name:
                 nn.init.constant_(param, 0)
     else:
-        if verbose:
-            warnings.warn(f'No initialization implemented for {m.__class__.__name__}.', stacklevel=2)
+        rank_zero_warn(
+            f'No initialization implemented for {m.__class__.__name__}.'
+            )
         pass
+
