@@ -253,7 +253,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
             A dictionary containing the computed losses and their respective 
             names.
         """
-        raise NotImplementedError('The _compute_loss method must be implemented.')
+        raise NotImplementedError('The _compute_losses method must be implemented.')
     
 
     def _log(self, name: str, value: torch.Tensor, on_epoch : bool = True, **kwargs) -> None:
