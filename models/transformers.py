@@ -146,23 +146,32 @@ class Transformer(BaseTransformer):
     """
     Transformer model, as vanilla as it gets.
 
-    Args:
-        embed_dim (int): The embedding dimension.
-        feedforward_dim (int): The dimension of the feedforward layer in the transformer encoder.
-        num_heads (int): The number of attention heads in the transformer encoder.
-        num_layers (int): The number of layers in the transformer encoder.
-        lr_warmup_steps (int, optional): The number of warmup steps for the learning rate. Defaults to 4000.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
+    Parameters:
+    -----------
+    output_dim (int):
+        The output dimension.
+    feedforward_dim (int): 
+        The dimension of the feedforward layer in the transformer encoder.
+    num_heads (int): 
+        The number of attention heads in the transformer encoder.
+    num_layers (int): 
+        The number of layers in the transformer encoder.
+    norm_first (bool): 
+        Whether to apply layer normalization before the self-attention and 
+        feedforward layers. Defaults to False. True will yield a PreLN 
+        Transformer, as described in 'On Layer Normalization in the Transformer 
+        Architecture', found at https://arxiv.org/abs/2002.04745.
+    *args: 
+        Variable length argument list.
+    **kwargs: 
+        Arbitrary keyword arguments.
 
     Attributes:
-        lr_warmup_steps (int): The number of warmup steps for the learning rate.
-        embed_dim (int): The embedding dimension.
-        pos_encoder (SinusoidalPosEnc): The positional encoder.
-        embedding (nn.Embedding): The embedding layer.
-        tfl (nn.TransformerEncoderLayer): The transformer encoder layer.
-        tfe (nn.TransformerEncoder): The transformer encoder.
-        linear (nn.Linear): The final linear layer.
+    ----------
+    tfe (nn.TransformerEncoder): 
+        The transformer encoder.
+    linear (nn.Linear): 
+        The final linear layer.
     """
     def __init__(
             self,
@@ -170,6 +179,7 @@ class Transformer(BaseTransformer):
             feedforward_dim: int,
             num_heads: int,
             num_layers: int,
+            norm_first: bool = False,
             *args, **kwargs,
             ):
         super().__init__(*args, **kwargs)
@@ -179,7 +189,8 @@ class Transformer(BaseTransformer):
                 nn.TransformerEncoderLayer(
                     d_model=self.embed_dim,
                     nhead=num_heads,
-                    dim_feedforward=feedforward_dim
+                    dim_feedforward=feedforward_dim,
+                    norm_first=norm_first,
                     )
                     )
 
@@ -211,58 +222,7 @@ class Transformer(BaseTransformer):
         return torch.mean(x, dim=-1, keepdim=True)
 
 
-
 import torch.nn.functional as F
-class PreLNTransformer(BaseTransformer):
-    def __init__(
-            self, 
-            num_heads : int, 
-            num_layers : int,
-            feedforward_dim : int,
-            *args, **kwargs
-            ):
-        super().__init__(*args, **kwargs)
-        self.num_heads = num_heads
-        self.num_layers = num_layers
-                
-        self.attention_layers = nn.ModuleList(
-            [nn.MultiheadAttention(self.embed_dim, num_heads) for _ in range(num_layers)]
-        )
-        
-        self.feedforward_layers = nn.ModuleList([
-            nn.Sequential(
-                nn.Linear(self.embed_dim, feedforward_dim),
-                nn.ReLU(),
-                nn.Linear(feedforward_dim, self.embed_dim)
-            ) for _ in range(num_layers)
-        ])
-        
-        self.linear = nn.Linear(self.embed_dim, 1)
-        
-
-    def forward(self, x):
-        x = self._embed(x)
-        
-        for i in range(self.num_layers):
-            residual = x
-            x = F.layer_norm(x, normalized_shape=[x.size(-1)])
-            x, _ = self.attention_layers[i](x, x, x)
-            x = x + residual
-            
-            residual = x
-            x = F.layer_norm(x, normalized_shape=[x.size(-1)])
-            x = self.feedforward_layers[i](x) + residual
-        
-        x = self.linear(x).squeeze(-1)  # pass through the final linear layer
-        return torch.mean(x, dim=-1, keepdim=True)
-
-
-
-
-
-
-
-
 class MultiHeadSelfAttentionWithBias(nn.Module):
     def __init__(self, num_heads : int, embed_dim : int, dropout : float = 0.0) -> None:
         super().__init__()
