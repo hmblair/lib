@@ -2,10 +2,9 @@ from typing import Optional, Tuple, Union, Callable, Any
 import torch
 import torch.nn as nn
 from models.schedulers import LinearWarmupAndInverseSqrtDecayLR
-from models.abstract_models import BaseModel
 
 
-class BaseTransformer(BaseModel):
+class BaseTransformer(nn.Module):
     """
     Base for building transformer models upon. Implements the embedding layer and the learning rate scheduler,
     as well as some boilerplate methods.
@@ -40,8 +39,8 @@ class BaseTransformer(BaseModel):
     def __init__(
             self, 
             embed_dim : int,
-            num_embeddings : int = 8, 
-            lr_warmup_steps : int = 8000,
+            num_embeddings : int, 
+            lr_warmup_steps : int,
             *args, **kwargs
             ):
         super().__init__(*args, **kwargs)
