@@ -413,32 +413,36 @@ class BaseClassifier(BaseModel):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.crossentropy = torch.nn.CrossEntropyLoss()
+        self.cross_entropy = torch.nn.CrossEntropyLoss()
 
 
-    def _compute_losses(self, batch) -> dict[str, torch.Tensor]:
+    def _compute_cross_entropy_and_accuracy(
+            self, x : torch.Tensor, y : torch.Tensor
+            ) -> dict[str, torch.Tensor]:
         """
-        Computes the cross-entropy loss and accuracy for the given batch.
+        Computes the cross-entropy loss and accuracy for the given inputs and
+        targets.
 
-        Args:
-            batch (any): The input data.
+        Parameters:
+        ----------
+        x (torch.Tensor): 
+            The input tensor.
+        y (torch.Tensor):
+            The target tensor.
 
         Returns:
-            dict[str, torch.Tensor]: A dictionary containing the computed
-            loss and accuracy, along with their respective names.  
+        --------
+        dict[str, torch.Tensor]: 
+            A dictionary containing the computed loss and accuracy.
         """
-        # get the input and output tensors
-        x, y = self._get_inputs_and_outputs(batch)
+        # get the logits via the forward step
+        logits = self(x) 
+        # compute the loss at the masked indices
+        loss = self.cross_entropy(y, logits) 
 
-        # compute the logits
-        logits = self(x)
-
-        # compute the cross-entropy loss
-        loss = self.crossentropy(logits, y)
-
+        # compute the predicted tokens from the logits
+        predictions = torch.argmax(logits, dim=-1) 
         # compute the accuracy
-        predictions = torch.argmax(logits, dim=-1)
-        accuracy = torch.mean((predictions == y).float())
+        accuracy = torch.sum(predictions == y) 
 
-        # return the loss and accuracy in a dictionary
         return {'loss': loss, 'accuracy': accuracy}
