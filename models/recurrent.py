@@ -2,9 +2,8 @@
 
 import torch
 import torch.nn as nn
-from models.abstract_models import BaseModel
 
-class RNN(BaseModel):
+class RNN(nn.Module):
     """
     A bidirectional encoder-decoder style recurrent neural network with an 
     arbitrary number of hidden layers.
