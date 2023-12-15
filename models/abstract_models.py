@@ -102,7 +102,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
                 'No modules were found in the model. The weights will not be initialized.'
                 )
         for m in self.modules():
-            if m.requires_grad:
+            if not m.children():
                 xavier_init(m)
 
 
@@ -237,17 +237,15 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         return losses['loss']
 
 
-    def _compute_losses(self, *args, **kwargs) -> dict[str, torch.Tensor]:
+    def _compute_losses(self, batch : Any) -> dict[str, torch.Tensor]:
         """
         Compute the losses for the model. The loss named 'loss' will be the one 
         which is used to train the model.
 
         Parameters:
         ----------
-        *args: 
-            Variable length argument list.
-        **kwargs: 
-            Arbitrary keyword arguments.
+        batch (Any): 
+            The input batch of data.
 
         Returns:
         --------
@@ -380,7 +378,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         """
         available, total = torch.cuda.mem_get_info()
         return float(available), float(available) / float(total)
-        
+    
     
     def _get_lr(self) -> float:
         """
