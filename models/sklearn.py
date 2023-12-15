@@ -1,7 +1,6 @@
-# linear_regression.py
+# sklearn.py
 
 import numpy as np
-from data.h5tools import TableSequence, HDF5File
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error
 import xgboost as xgb
@@ -10,7 +9,7 @@ class SKLearnBase:
     """
     A base class for all scikit-learn models.
     """
-    def fit(self, x, y):
+    def fit(self, x : np.ndarray, y : np.ndarray) -> None:
         """
         Fit the model to the data.
 
@@ -24,7 +23,7 @@ class SKLearnBase:
         self.regressor.fit(x, y)
 
 
-    def predict(self, x):
+    def predict(self, x : np.ndarray) -> np.ndarray:
         """
         Make predictions using the model.
 
@@ -41,7 +40,7 @@ class SKLearnBase:
         return self.regressor.predict(x)
     
 
-    def compute_mae(self, x, y):
+    def compute_mae(self, x : np.ndarray, y : np.ndarray) -> float:
         """
         Make predictions using the model and compute the mean absolute error.
 
@@ -65,7 +64,7 @@ class LinearRegression(SKLearnBase):
     """
     A simple linear regression model.
     """
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initialize the model.
         """
@@ -83,7 +82,7 @@ class XGBoost(SKLearnBase):
             max_depth : int,
             alpha : int,
             n_estimators : int,
-            ):
+            ) -> None:
         """
         Initialize the model.
         """
@@ -94,4 +93,33 @@ class XGBoost(SKLearnBase):
             max_depth = max_depth,
             alpha = alpha,
             n_estimators = n_estimators,
+            )
+        
+
+class KernelRidge(SKLearnBase):
+    """
+    A kernel ridge regression model.
+
+    Parameters:
+    ----------
+    alpha (float):
+        Regularization strength.
+    kernel (str):
+        Kernel function.
+    *args, **kwargs:
+        Additional arguments to pass to the kernel ridge regressor.
+    """
+    def __init__(
+            self, 
+            alpha : float, 
+            kernel : str,
+            *args, **kwargs,
+            ) -> None:
+        """
+        Initialize the model.
+        """
+        self.regressor = KernelRidge(
+            alpha=alpha,
+            kernel=kernel,
+            *args, **kwargs,
             )
