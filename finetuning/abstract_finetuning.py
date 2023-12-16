@@ -28,10 +28,12 @@ class LoRALayerWrapper(nn.Module):
     lora_B (nn.Parameter): 
         LoRA weight B.
     """
-    def __init__(self, 
-                 base_module: nn.Module, 
-                 lora_rank: int, 
-                 device: Union[str, torch.device]) -> None:
+    def __init__(
+            self, 
+            base_module: nn.Module, 
+            lora_rank: int, 
+            device: Union[str, torch.device]
+            ) -> None:
         super().__init__()
         self.base_module = base_module
         weight_shape = self.base_module.weight.shape
@@ -56,8 +58,11 @@ class LoRALayerWrapper(nn.Module):
             torch.Tensor: The output tensor after applying the base module and 
             adding on the LoRA perturbation.
         """
-        base_out = self.base_module(x)  # The output of the pre-trained module.
-        return base_out + (x @ self.lora_A) @ self.lora_B.T # add on the LoRA perturbation
+        # compute the output of the base module
+        base_out = self.base_module(x)  
+
+        # add on the LoRA perturbation
+        return base_out + (x @ self.lora_A) @ self.lora_B.T 
 
 
 from pytorch_lightning.utilities.model_summary import summarize
@@ -89,26 +94,33 @@ class BaseFineTuningModel(BaseModel, metaclass = ABCMeta):
     lora_p (int | None): 
         The rank of LoRA.
     """
-    def __init__(self, 
-                 unfreeze_epoch: Optional[int] = None, 
-                 lora_p: Optional[int] = None, 
-                 *args, **kwargs) -> None:
+    def __init__(
+            self, 
+            unfreeze_epoch: Optional[int] = None, 
+            lora_p: Optional[int] = None, 
+            *args, **kwargs,
+            ) -> None:
         super().__init__(*args, **kwargs)
 
-        self.pt_model = self.load_model()  # load the pre-trained model
-        self.freeze() # freeze the model to begin with
+         # load the pre-trained model
+        self.pt_model = self.load_model() 
+         # freeze the model to begin with
+        self.freeze()
 
-        self.unfreeze_epoch = unfreeze_epoch  # the epoch to unfreeze the pre-trained model
-        self.lora_p = lora_p  # the rank of LoRA
+        # store the epoch to unfreeze the pre-trained model and the rank of LoRA
+        self.unfreeze_epoch = unfreeze_epoch  
+        self.lora_p = lora_p
 
+        # wrap the LoRA layer around the pre-trained model    
         if lora_p is not None:
-            self._lora_wrapper() # wrap the LoRA layer around the pre-trained model    
+            self._lora_wrapper() 
 
 
     @abstractmethod
     def load_model(self) -> nn.Module:
         """
-        Loads a pre-trained model. Must be implemented by the child class.
+        Loads a pre-trained model. An abstract method which must be implemented
+        by the child class.
         """
         return
 
@@ -159,10 +171,13 @@ class BaseFineTuningModel(BaseModel, metaclass = ABCMeta):
         """
         lora_params = []
         for module in self.pt_model.modules():
-            if isinstance(module, nn.Linear):
-                module = LoRALayerWrapper(module, self.lora_p, self.device) # wrap the LoRA layer around the module
-                lora_params += [module.lora_A, module.lora_B] # store the LoRA parameters
-        self.lora_params = nn.ParameterList(lora_params).requires_grad_(False) # set the LoRA parameters to untrainable
+            if not module.children(): 
+                # wrap the LoRA layer around the module
+                module = LoRALayerWrapper(module, self.lora_p, self.device) 
+                # store the LoRA parameters
+                lora_params += [module.lora_A, module.lora_B] 
+        # set the LoRA parameters to untrainable
+        self.lora_params = nn.ParameterList(lora_params).requires_grad_(False) 
 
 
     def _layers_to_unfreeze(self) -> Iterable:
@@ -176,5 +191,6 @@ class BaseFineTuningModel(BaseModel, metaclass = ABCMeta):
         Iterable:
             The layers to unfreeze. Defaults to the entire pre-trained model.
         """
-        yield self.pt_model # yield the pre-trained model by default
+        # yield the pre-trained model by default
+        yield self.pt_model 
     
