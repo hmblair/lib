@@ -7,6 +7,25 @@ import psutil
 from models.weight_init import xavier_init
 
 
+def module_requires_grad(module: torch.nn.Module) -> bool:
+    """
+    Verifies that all parameters of the given module have requires_grad set to 
+    True.
+
+    Parameters:
+    ----------
+    module (torch.nn.Module): 
+        The module to be verified.
+
+    Returns:
+    -------
+    bool: 
+        True if all parameters of the module have requires_grad set to True, 
+        False otherwise.
+    """
+    return all(param.requires_grad for param in module.parameters())
+
+
 class WeightInitialisationMetaClass(type):
     """
     A metaclass that automatically calls the _weight_init() method of a class
@@ -21,7 +40,6 @@ class WeightInitialisationMetaClass(type):
     def __call__(cls, *args, **kwargs):
         # create an instance of the class using the __call__ method of the type class
         obj = type.__call__(cls, *args, **kwargs)
-
         # initialize the weights
         obj._weight_init()
 
