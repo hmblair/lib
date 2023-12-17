@@ -1,7 +1,6 @@
 from torch.optim.lr_scheduler import _LRScheduler
 import math
 from abc import abstractmethod, ABCMeta
-from typing import Iterable
 
 
 class WarmupAndDecayLRScheduler(_LRScheduler, metaclass=ABCMeta):

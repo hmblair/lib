@@ -1,6 +1,6 @@
 import torch
 import unittest
-from models.abstract_models import BaseModel
+from models.bedrock.abstract_models import BaseModel
 
 class BoringBaseModel(BaseModel):
     def __init__(self, in_size : int, out_size : int, *args, **kwargs) -> None:

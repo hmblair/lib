@@ -1,10 +1,7 @@
 # weight_init.py
 
-import torch
 import torch.nn as nn
-import warnings
 from typing import Union
-import numpy as np
 from pytorch_lightning.utilities import rank_zero_warn
 
 def xavier_init(
@@ -49,7 +46,9 @@ def xavier_init(
         nn.init.xavier_uniform_(m.weight, gain)
         if m.padding_idx is not None:
             nn.init.constant_(m.weight[m.padding_idx], 0)
-    elif isinstance(m, (nn.RNN, nn.GRU, nn.LSTM, nn.LSTMCell, nn.GRUCell, nn.RNNCell, nn.Transformer, nn.TransformerEncoder, nn.TransformerDecoder)):
+    elif isinstance(m, (nn.RNN, nn.GRU, nn.LSTM, nn.LSTMCell, nn.GRUCell, 
+                        nn.RNNCell, nn.Transformer, nn.TransformerEncoder, 
+                        nn.TransformerDecoder)):
         for name, param in m.named_parameters():
             if 'weight' in name and param.data.dim() == 2:
                 nn.init.xavier_uniform_(param, gain)

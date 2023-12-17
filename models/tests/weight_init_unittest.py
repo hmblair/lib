@@ -4,7 +4,7 @@ import unittest
 import torch.nn as nn
 import torch
 
-from models.weight_init import xavier_init
+from models.bedrock.weight_init import xavier_init
 
 class TestWeightInit(unittest.TestCase):
     def test_layer_norm(self):

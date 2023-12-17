@@ -1,7 +1,6 @@
 from typing import Optional, Tuple, Union, Callable, Any
 import torch
 import torch.nn as nn
-from models.schedulers import LinearWarmupAndInverseSqrtDecayLR
 
 
 class BaseTransformer(nn.Module):

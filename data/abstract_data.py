@@ -184,7 +184,7 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
             raise ValueError(f'Invalid stage {stage}. The stage must be either "fit", "validate", "test" or "predict".')
 
 
-    def train_dataloader(self) -> torch.utils.data.DataLoader:
+    def train_dataloader(self) -> DataLoader:
         """
         Returns the train dataloader.
 
@@ -196,7 +196,7 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         return self._create_dataloaders('train')
 
 
-    def val_dataloader(self) -> torch.utils.data.DataLoader:
+    def val_dataloader(self) -> DataLoader:
         """
         Returns the validaiton dataloader.
 
@@ -208,7 +208,7 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         return self._create_dataloaders('validate')
 
 
-    def test_dataloader(self) -> torch.utils.data.DataLoader:
+    def test_dataloader(self) -> DataLoader:
         """
         Returns the test dataloader.
 
@@ -220,7 +220,7 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         return self._create_dataloaders('test')
 
 
-    def predict_dataloader(self) -> torch.utils.data.DataLoader:
+    def predict_dataloader(self) -> DataLoader:
         """
         Returns the prediction dataloader.
 

@@ -4,12 +4,12 @@ import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
 import psutil
 
-from models.weight_init import xavier_init
+from weight_init import xavier_init
 
 
 def module_requires_grad(module: torch.nn.Module) -> bool:
     """
-    Verifies that all parameters of the given module have requires_grad set to 
+    Checks whether all parameters of the given module have requires_grad set to 
     True.
 
     Parameters:
@@ -120,7 +120,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
                 'No modules were found in the model. The weights will not be initialized.'
                 )
         for m in self.modules():
-            if not m.children():
+            if not m.children() and module_requires_grad(m):
                 xavier_init(m)
 
 
@@ -422,12 +422,15 @@ class BaseClassifier(BaseModel):
     Base class for PyTorch Lightning models that perform classification. 
 
     Attributes:
-        crossentropy (torch.nn.CrossEntropyLoss): The cross-entropy loss 
-        function.
+    ----------
+    cross_entropy (torch.nn.CrossEntropyLoss): 
+        The cross-entropy loss function.
 
     Inherits:
-        BaseModel: Base class for PyTorch Lightning models that abstracts away 
-        some of the boilerplate code.
+    --------
+    BaseModel: 
+        Base class for PyTorch Lightning models that abstracts away some of the 
+        boilerplate code.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 from typing import Optional
 
-from utils.pairwise import pairwise
-from models.dense import DenseNetwork
+from pairwise import pairwise
+from dense import DenseNetwork
 
 
 class ConvLayer(nn.Module):
