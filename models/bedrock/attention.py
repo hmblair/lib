@@ -150,7 +150,7 @@ class AttentionWeightMetaClass(WeightInitialisationMetaClass):
                 model=obj,
                 layer_type=AttentiveModule,
                 hook=obj.attention_weights,
-                transform=get_attn_layer,
+                transform=None,
                 patch=patch_attn_to_return_weights,
             )
 
