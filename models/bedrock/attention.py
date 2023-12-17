@@ -65,7 +65,7 @@ def patch_attn_to_return_weights(m : nn.MultiheadAttention) -> None:
 
     def wrap(*args, **kwargs):
         kwargs["need_weights"] = True
-        kwargs["average_attn_weights"] = False
+        # kwargs["average_attn_weights"] = False
         return forward_orig(*args, **kwargs)
 
     m.forward = wrap
