@@ -2,7 +2,7 @@
 
 import torch.nn as nn
 import torch_geometric
-from pairwise import pairwise
+from .pairwise import pairwise
 
 class GNN(nn.Module):
     """

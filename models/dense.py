@@ -2,7 +2,7 @@
 
 import torch
 import torch.nn as nn
-from pairwise import pairwise
+from .pairwise import pairwise
 
 class DenseNetwork(nn.Module):
     """
