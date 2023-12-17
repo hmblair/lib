@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
 import psutil
 
-from weight_init import xavier_init
+from .weight_init import xavier_init
 
 
 def module_requires_grad(module: torch.nn.Module) -> bool:
