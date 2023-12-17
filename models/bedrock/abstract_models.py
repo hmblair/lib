@@ -1,5 +1,6 @@
-from typing import Any
+from typing import Any, Callable, Union, Optional
 import torch
+import torch.nn as nn
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
 import psutil
@@ -32,6 +33,9 @@ class WeightInitialisationMetaClass(type):
     after all child classes are initialized. This is useful for initializing
     the weights of a model after it is initialized.
 
+    Any class that inherits from this metaclass must implement the _weight_init()
+    method, and have a save_attention_weights attribute.
+
     Inherits:
     --------
     type: 
@@ -44,7 +48,7 @@ class WeightInitialisationMetaClass(type):
         obj._weight_init()
 
         return obj
-    
+
 
 from abc import ABCMeta
 class WeightInitialisationABCMeta(ABCMeta):
@@ -81,8 +85,9 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
     pl.LightningModule: 
         Base class for all PyTorch Lightning models.
     """
-    def __init__(self):
+    def __init__(self, validate_losses : bool = True):
         super().__init__()
+        self.validate_losses = validate_losses
 
         # save the hyperparameters
         self.save_hyperparameters()  
@@ -250,7 +255,8 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
 
         # loop through the losses, ensuring that they are valid and logging them
         for name, value in losses.items():
-            self._validate_losses(value, name) 
+            if self.validate_losses:
+                self._validate_losses(value, name) 
             self._log(phase + '_' + name, value) 
         return losses['loss']
 
@@ -409,8 +415,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         """
         return self.optimizers().param_groups[0]["lr"]
     
-
-
+    
 
 
 
