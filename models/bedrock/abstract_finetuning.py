@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from typing import Optional, Union, Iterable
 
-from abstract_models import BaseModel
+from .abstract_models import BaseModel
 
 class LoRALayerWrapper(nn.Module):
     """
