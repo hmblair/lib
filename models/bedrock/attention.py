@@ -1,5 +1,6 @@
 # attention.py
 
+import torch
 import torch.nn as nn
 from typing import Callable, Optional, Union
 from .abstract_models import BaseModel, WeightInitialisationMetaClass
@@ -85,7 +86,7 @@ class SaveAttentionWeights:
         self.outputs = []
 
     def pop_weights(self):
-        out = self.outputs
+        out = torch.stack(self.outputs, dim=1)
         self.clear()
         return out
     
