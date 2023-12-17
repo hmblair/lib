@@ -26,8 +26,8 @@ def module_requires_grad(module: torch.nn.Module) -> bool:
     """
     return all(param.requires_grad for param in module.parameters())
 
-
-class WeightInitialisationMetaClass(type):
+from abc import ABCMeta
+class WeightInitialisationMetaClass(ABCMeta):
     """
     A metaclass that automatically calls the _weight_init() method of a class
     after all child classes are initialized. This is useful for initializing
@@ -50,29 +50,28 @@ class WeightInitialisationMetaClass(type):
         return obj
 
 
-from abc import ABCMeta
-class WeightInitialisationABCMeta(ABCMeta):
-    """
-    A metaclass that automatically calls the _weight_init() method of a class
-    after all child classes are initialized. This is useful for initializing
-    the weights of a model after it is initialized. In addition, this metaclass
-    also ensures that the class is an abstract base class, meaning that it 
-    cannot be instantiated without all of its abstract methods being 
-    implemented.
+# class WeightInitialisationABCMeta(ABCMeta):
+#     """
+#     A metaclass that automatically calls the _weight_init() method of a class
+#     after all child classes are initialized. This is useful for initializing
+#     the weights of a model after it is initialized. In addition, this metaclass
+#     also ensures that the class is an abstract base class, meaning that it 
+#     cannot be instantiated without all of its abstract methods being 
+#     implemented.
 
-    Inherits:
-    --------
-    ABCMeta: 
-        A metaclass for defining Abstract Base Classes (ABCs).
-    """
-    def __call__(cls, *args, **kwargs):
-        # create an instance of the class using the __call__ method of the ABCMeta class
-        obj = ABCMeta.__call__(cls, *args, **kwargs)
+#     Inherits:
+#     --------
+#     ABCMeta: 
+#         A metaclass for defining Abstract Base Classes (ABCs).
+#     """
+#     def __call__(cls, *args, **kwargs):
+#         # create an instance of the class using the __call__ method of the ABCMeta class
+#         obj = ABCMeta.__call__(cls, *args, **kwargs)
 
-        # initialize the weights
-        obj._weight_init()
+#         # initialize the weights
+#         obj._weight_init()
 
-        return obj
+#         return obj
 
 
 class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
@@ -415,7 +414,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         """
         return self.optimizers().param_groups[0]["lr"]
     
-    
+
 
 
 
