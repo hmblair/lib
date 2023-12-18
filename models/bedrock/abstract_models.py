@@ -73,6 +73,10 @@ def patch_and_register_layer_hooks(
             handles.append(
                 m.register_forward_hook(hook)
                 )
+    if not handles:
+        rank_zero_warn(
+            f'No {layer_type} layers were found in the model. The hook will not be registered.'
+            )
     return handles
 
 
@@ -518,7 +522,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
                 patch=patch,
                 )
             )
-        
+    
     
     def remove_hooks(self) -> None:
         """
