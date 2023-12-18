@@ -108,7 +108,7 @@ class AttentionWeightMetaClass(WeightInitialisationMetaClass):
             # patch the model so that the attention layers return the attention weights
             # and register a hook to save the attention weights
             obj.patch_and_register_layer_hooks(
-                layer_type=obj.attn_layer_types,
+                layer_type=AttentiveModule,
                 hook=obj.attention_weights,
                 transform=None,
                 patch=patch_attn_to_return_weights,
@@ -124,12 +124,10 @@ class BaseAttentionModel(BaseModel, metaclass=AttentionWeightMetaClass):
     def __init__(
             self, 
             save_attn_weights : bool = False,
-            attn_layer_types : tuple[type[nn.Module], ...] = AttentiveModule,
             ):
         super().__init__()
         self.save_attn_weights = save_attn_weights
         self.attention_weights = SaveAttentionWeights()
-        self.attn_layer_types = attn_layer_types
 
     
     def save_attn(self, save_attn_weights : bool = True) -> None:
