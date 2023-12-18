@@ -7,12 +7,12 @@ from .abstract_models import BaseModel, WeightInitialisationMetaClass
 import fm
 
 # will this return the self-attention weights twice?
-AttentiveModule = Union[
+AttentiveModule = (
     nn.MultiheadAttention, 
     # nn.TransformerEncoderLayer,
     # nn.TransformerDecoderLayer,
     fm.multihead_attention.MultiheadAttention,
-    ]
+)
 def patch_attn_to_return_weights(m : nn.MultiheadAttention) -> None:
     """
     Force the attention module to return the attention weights.
