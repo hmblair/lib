@@ -5,6 +5,8 @@ psutil
 numpy
 pandas
 tables
+xgboost
+sklearn
 
 torch
 tensordict
