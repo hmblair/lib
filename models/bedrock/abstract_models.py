@@ -284,10 +284,10 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
             The inputs and predicted outputs from the model for the input batch.
         """ 
         # get the input from the batch
-        x, _ = self._get_inputs_and_outputs(batch) 
+        x, y = self._get_inputs_and_outputs(batch) 
 
         # return the input and the predicted output
-        return x, self(x) 
+        return x, self(x), y
 
 
     def on_train_epoch_start(self) -> None:
