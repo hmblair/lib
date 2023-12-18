@@ -127,7 +127,7 @@ class BaseAttentionModel(BaseModel, metaclass=AttentionWeightMetaClass):
             ):
         super().__init__()
         self.save_attn_weights = save_attn_weights
-        self.attention_weights = SaveAttentionWeights()
+        # self.attention_weights = SaveAttentionWeights()
 
     
     def save_attn(self, save_attn_weights : bool = True) -> None:
