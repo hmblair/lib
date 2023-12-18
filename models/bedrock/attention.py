@@ -3,7 +3,8 @@
 import torch
 import torch.nn as nn
 from typing import Callable, Optional, Union, Any
-from .abstract_models import BaseModel, WeightInitialisationMetaClass, patch_and_register_layer_hooks, HookContextManager
+from .abstract_models import BaseModel
+from .hook import HookContextManager
 import fm
 
 # will this return the self-attention weights twice?
