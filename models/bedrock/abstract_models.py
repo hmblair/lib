@@ -26,6 +26,58 @@ def module_requires_grad(module: torch.nn.Module) -> bool:
     """
     return all(param.requires_grad for param in module.parameters())
 
+
+def patch_and_register_layer_hooks(
+        model : nn.Module, 
+        layer_type : type[nn.Module], 
+        hook : Callable,
+        transform : Optional[Callable] = None,
+        patch : Optional[Callable] = None,
+        ) -> list[torch.utils.hooks.RemovableHandle]:
+    """
+    Register a hook on all layers of the given model that are of the given type.
+    Along the way, optionally patch the layers with the given patch function.
+
+    Parameters:
+    ----------
+    model (nn.Module): 
+        The model to register the hook on.
+    layer_type (type[nn.Module]):
+        The type of layer to register the hook on.
+    hook (Callable): 
+        The hook to register.
+    transform (Callable):
+        A function to transform the layer before registering the hook.
+        This is useful, for example, for registering hooks on the attention
+        modules of a transformer layer. Defaults to None.
+    patch (Optional[Callable]):
+        A function to patch the layer before registering the hook.
+        This is useful, for example, for guaranteeing that the attention
+        modules of a transformer layer return the attention weights.
+        Defaults to None.
+
+    Returns:
+    --------
+    list[nn.utils.hooks.RemovableHandle]:
+        A list of handles returned by the register_forward_hook() method of
+        the layers of the given model that are of the given type. This list 
+        can be used to remove the hooks later, via the remove() method.
+    """
+    handles = []
+    for m in model.modules():
+        if isinstance(m, layer_type):
+            if transform is not None:
+                m  = transform(m)
+            if patch is not None:
+                patch(m)
+            handles.append(
+                m.register_forward_hook(hook)
+                )
+    return handles
+
+
+
+
 from abc import ABCMeta
 class WeightInitialisationMetaClass(ABCMeta):
     """
@@ -88,6 +140,9 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         super().__init__()
         self.validate_losses = validate_losses
 
+        # create a list to store any hooks that are registered
+        self.hooks = []
+
         # save the hyperparameters
         self.save_hyperparameters()  
 
@@ -128,7 +183,11 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
                 xavier_init(m)
 
 
-    def training_step(self, batch : Any, batch_ix : list[int]) -> torch.Tensor:
+    def training_step(
+            self, 
+            batch : Any, 
+            batch_ix : list[int]
+            ) -> torch.Tensor:
         """
         Performs a single training step.
 
@@ -164,7 +223,11 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         return loss
     
 
-    def validation_step(self, batch : Any, batch_ix : list[int]) -> None:
+    def validation_step(
+            self, 
+            batch : Any, 
+            batch_ix : list[int],
+            ) -> None:
         """
         Perform a validation step on a batch of data.
 
@@ -178,7 +241,11 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         _ = self._compute_and_log_losses(batch, 'val') # compute the losses
 
     
-    def test_step(self, batch : Any, batch_ix : list[int]) -> None:
+    def test_step(
+            self, 
+            batch : Any, 
+            batch_ix : list[int],
+            ) -> None:
         """
         Perform a test step on a batch of data.
 
@@ -313,7 +380,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
                 on_step=True, 
                 **kwargs)
 
-    
+
     def _validate_losses(self, loss : torch.Tensor, name : str) -> None:
         """
         Validates the loss value to ensure it is not NaN, infinite, or negative.
@@ -413,6 +480,53 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
             The current learning rate.
         """
         return self.optimizers().param_groups[0]["lr"]
+    
+
+    def patch_and_register_layer_hooks(
+            self,
+            layer_type : type[nn.Module],
+            hook : Callable,
+            transform : Optional[Callable] = None,
+            patch : Optional[Callable] = None,
+            ) -> None:
+        """
+        Register a hook on all layers of the given type in the model. Along the
+        way, optionally patch the layers with the given patch function.
+
+        Parameters:
+        ----------
+        layer_type (type[nn.Module]):
+            The type of layer to register the hook on.
+        hook (Callable):
+            The hook to register.
+        transform (Callable):
+            A function to transform the layer before registering the hook.
+            This is useful, for example, for registering hooks on the attention
+            modules of a transformer layer. Defaults to None.
+        patch (Optional[Callable]):
+            A function to patch the layer before registering the hook.
+            This is useful, for example, for guaranteeing that the attention
+            modules of a transformer layer return the attention weights.
+            Defaults to None.
+        """
+        self.hooks.extend(
+            patch_and_register_layer_hooks(
+                model=self,
+                layer_type=layer_type,
+                hook=hook,
+                transform=transform,
+                patch=patch,
+                )
+            )
+        
+    
+    def remove_hooks(self) -> None:
+        """
+        Removes all hooks that were registered on the model.
+        """
+        for hook in self.hooks:
+            hook.remove()
+        self.hooks = []
     
 
 
