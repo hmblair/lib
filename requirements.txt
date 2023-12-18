@@ -6,7 +6,7 @@ numpy
 pandas
 tables
 xgboost
-sklearn
+scikit-learn
 
 torch
 tensordict
