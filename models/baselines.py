@@ -61,7 +61,7 @@ class SKLearnBase:
         return mean_absolute_error(y, preds)
 
 
-class LinearRegression(SKLearnBase):
+class LinearRegressor(SKLearnBase):
     """
     A simple linear regression model.
     """
