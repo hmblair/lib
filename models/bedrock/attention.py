@@ -117,7 +117,7 @@ class AttentionWeightMetaClass(WeightInitialisationMetaClass):
             # patch the model so that the forward pass returns the attention weights
             # patch_forward_to_return_attn_weights(obj)
 
-            return obj
+        return obj
 
 
 class BaseAttentionModel(BaseModel, metaclass=AttentionWeightMetaClass):
