@@ -6,46 +6,6 @@ from typing import Callable, Optional, Union
 from .abstract_models import BaseModel, WeightInitialisationMetaClass
 import fm
 
-
-def patch_and_register_layer_hooks(
-        model : nn.Module, 
-        layer_type : type[nn.Module], 
-        hook : Callable,
-        transform : Optional[Callable] = None,
-        patch : Optional[Callable] = None,
-        ) -> None:
-    """
-    Register a hook on all layers of the given model that are of the given type.
-    Along the way, optionally patch the layers with the given patch function.
-
-    Parameters:
-    ----------
-    model (nn.Module): 
-        The model to register the hook on.
-    layer_type (type[nn.Module]):
-        The type of layer to register the hook on.
-    hook (Callable): 
-        The hook to register.
-    transform (Callable):
-        A function to transform the layer before registering the hook.
-        This is useful, for example, for registering hooks on the attention
-        modules of a transformer layer. Defaults to None.
-    patch (Optional[Callable]):
-        A function to patch the layer before registering the hook.
-        This is useful, for example, for guaranteeing that the attention
-        modules of a transformer layer return the attention weights.
-        Defaults to None.
-    """
-    for m in model.modules():
-        if isinstance(m, layer_type):
-            if transform is not None:
-                m  = transform(m)
-            if patch is not None:
-                patch(m)
-            m.register_forward_hook(hook)
-
-
-
 # will this return the self-attention weights twice?
 AttentiveModule = Union[
     nn.MultiheadAttention, 
@@ -74,7 +34,7 @@ def patch_attn_to_return_weights(m : nn.MultiheadAttention) -> None:
 
 class SaveAttentionWeights:
     """
-    A hook that saves the attention weights of a transformer layer.
+    A hook that saves the attention weights of a transformer or attention layer.
     """
     def __init__(self):
         self.outputs = []
@@ -147,23 +107,62 @@ class AttentionWeightMetaClass(WeightInitialisationMetaClass):
         if hasattr(obj, 'attention_weights'):
             # patch the model so that the attention layers return the attention weights
             # and register a hook to save the attention weights
-            patch_and_register_layer_hooks(
-                model=obj,
-                layer_type=AttentiveModule,
+            obj.patch_and_register_layer_hooks(
+                layer_type=obj.attn_layer_types,
                 hook=obj.attention_weights,
                 transform=None,
                 patch=patch_attn_to_return_weights,
             )
 
             # patch the model so that the forward pass returns the attention weights
-            patch_forward_to_return_attn_weights(obj)
+            # patch_forward_to_return_attn_weights(obj)
 
             return obj
 
 
 class BaseAttentionModel(BaseModel, metaclass=AttentionWeightMetaClass):
-    def __init__(self, save_attn_weights : bool = False):
+    def __init__(
+            self, 
+            save_attn_weights : bool = False,
+            attn_layer_types : tuple[type[nn.Module], ...] = AttentiveModule,
+            ):
         super().__init__()
-        if save_attn_weights:
-            self.attention_weights = SaveAttentionWeights()
+        self.save_attn_weights = save_attn_weights
+        self.attention_weights = SaveAttentionWeights()
+        self.attn_layer_types = attn_layer_types
+
+    
+    def save_attn(self, save_attn_weights : bool = True) -> None:
+        """
+        Toggle whether to save the attention weights of the model during the
+        forward pass.
+
+        Parameters:
+        ----------
+        save_attn_weights (bool): 
+            Whether to save the attention weights of the model.
+            Defaults to True.
+        """
+        self.save_attn_weights = save_attn_weights
+
+    
+    def get_attn_weights(self, x : torch.Tensor) -> torch.Tensor:
+        """
+        Get the attention weights of the given input.
+
+        Parameters:
+        ----------
+        x (torch.Tensor): 
+            The input to the model, of shape (*, seq_len, d_model)
+
+        Returns:
+        --------
+        torch.Tensor: 
+            The attention weights of the model, of shape 
+            (*, n_layers, n_heads, seq_len, seq_len)
+        """
+        if not self.save_attn_weights:
+            raise AttributeError('Please set save_attn_weights to True before calling this method.')
+        self(x)
+        return self.attention_weights.pop_weights()
 
