@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
 import psutil
 
+from .hook import HookList, patch_and_register_layer_hooks
 from .weight_init import xavier_init
 
 
@@ -27,62 +28,8 @@ def module_requires_grad(module: torch.nn.Module) -> bool:
     return all(param.requires_grad for param in module.parameters())
 
 
-def patch_and_register_layer_hooks(
-        model : nn.Module, 
-        layer_type : type[nn.Module], 
-        hook : Callable,
-        transform : Optional[Callable] = None,
-        patch : Optional[Callable] = None,
-        ) -> list[torch.utils.hooks.RemovableHandle]:
-    """
-    Register a hook on all layers of the given model that are of the given type.
-    Along the way, optionally patch the layers with the given patch function.
 
-    Parameters:
-    ----------
-    model (nn.Module): 
-        The model to register the hook on.
-    layer_type (type[nn.Module]):
-        The type of layer to register the hook on.
-    hook (Callable): 
-        The hook to register.
-    transform (Callable):
-        A function to transform the layer before registering the hook.
-        This is useful, for example, for registering hooks on the attention
-        modules of a transformer layer. Defaults to None.
-    patch (Optional[Callable]):
-        A function to patch the layer before registering the hook.
-        This is useful, for example, for guaranteeing that the attention
-        modules of a transformer layer return the attention weights.
-        Defaults to None.
-
-    Returns:
-    --------
-    list[nn.utils.hooks.RemovableHandle]:
-        A list of handles returned by the register_forward_hook() method of
-        the layers of the given model that are of the given type. This list 
-        can be used to remove the hooks later, via the remove() method.
-    """
-    handles = []
-    for m in model.modules():
-        if isinstance(m, layer_type):
-            if transform is not None:
-                m  = transform(m)
-            if patch is not None:
-                patch(m)
-            handles.append(
-                m.register_forward_hook(hook)
-                )
-    if not handles:
-        rank_zero_warn(
-            f'No {layer_type} layers were found in the model. The hook will not be registered.'
-            )
-    return handles
-
-
-
-
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 class WeightInitialisationMetaClass(ABCMeta):
     """
     A metaclass that automatically calls the _weight_init() method of a class
@@ -94,40 +41,18 @@ class WeightInitialisationMetaClass(ABCMeta):
 
     Inherits:
     --------
-    type: 
-        A metaclass for creating classes.
+    ABCMeta: 
+        A metaclass that allows abstract methods to be defined.
     """
     def __call__(cls, *args, **kwargs):
-        # create an instance of the class using the __call__ method of the type class
+        # create an instance of the class using the __call__ method of the type 
+        # class
         obj = type.__call__(cls, *args, **kwargs)
         # initialize the weights
         obj._weight_init()
 
         return obj
 
-
-# class WeightInitialisationABCMeta(ABCMeta):
-#     """
-#     A metaclass that automatically calls the _weight_init() method of a class
-#     after all child classes are initialized. This is useful for initializing
-#     the weights of a model after it is initialized. In addition, this metaclass
-#     also ensures that the class is an abstract base class, meaning that it 
-#     cannot be instantiated without all of its abstract methods being 
-#     implemented.
-
-#     Inherits:
-#     --------
-#     ABCMeta: 
-#         A metaclass for defining Abstract Base Classes (ABCs).
-#     """
-#     def __call__(cls, *args, **kwargs):
-#         # create an instance of the class using the __call__ method of the ABCMeta class
-#         obj = ABCMeta.__call__(cls, *args, **kwargs)
-
-#         # initialize the weights
-#         obj._weight_init()
-
-#         return obj
 
 
 class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
@@ -145,7 +70,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         self.validate_losses = validate_losses
 
         # create a list to store any hooks that are registered
-        self.hooks = []
+        self.hooks = HookList()
 
         # save the hyperparameters
         self.save_hyperparameters()  
@@ -409,13 +334,13 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
             rank_zero_warn(f'The {name} is negative.')
 
 
-    def _get_inputs_and_outputs(self, batch : torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _get_inputs_and_outputs(self, batch : Any) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Get the inputs and corresponding outputs from the given batch.
 
         Parameters:
         ----------
-        batch (torch.Tensor): 
+        batch (Any): 
             The input batch.
 
         Returns:
@@ -428,6 +353,40 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         """
         raise NotImplementedError('The _get_inputs_and_outputs method must be implemented.')
     
+
+    def _get_inputs(self, batch : Any) -> torch.Tensor:
+        """
+        Get the inputs from the given batch.
+
+        Parameters:
+        ----------
+        batch (Any): 
+            The input batch.
+
+        Returns:
+        --------
+        torch.Tensor: 
+            The inputs.
+        """
+        raise NotImplementedError('The _get_inputs method must be implemented.')
+    
+
+    def _get_outputs(self, batch : Any) -> torch.Tensor:
+        """
+        Get the outputs from the given batch.
+
+        Parameters:
+        ----------
+        batch (Any): 
+            The input batch.
+
+        Returns:
+        --------
+        torch.Tensor: 
+            The outputs.
+        """
+        raise NotImplementedError('The _get_outputs method must be implemented.')
+
 
     def _check_constant(self, x : torch.Tensor, eps : float = 1E-8) -> bool:
         """
@@ -528,9 +487,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         """
         Removes all hooks that were registered on the model.
         """
-        for hook in self.hooks:
-            hook.remove()
-        self.hooks = []
+        self.hooks.remove_hooks()
     
 
 
