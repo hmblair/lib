@@ -172,15 +172,12 @@ class DistributedPredictionWriterToH5(DistributedPredictionWriter):
         # get the length of the sequences, in order to save them to the correct
         # table in the HDF5 file.
 
-        breakpoint()
-
         x, y, *_ = prediction
-
-        breakpoint()
 
         seq_len = x.shape[-1]
         dt=[('input', x.dtype, (seq_len,)), ('output', y.dtype)]
         data = np.zeros(y.shape, dtype=dt)
+        breakpoint()
         data['input'] = x
         data['output'] = y
 
