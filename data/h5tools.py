@@ -7,7 +7,9 @@ import os
 from typing import Union, Any, Iterable, Optional
 from collections.abc import Mapping, Sequence
 import warnings
-import torch    
+import torch
+from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
+
 
 class TableSequence(Mapping, Sequence):
     """
@@ -224,35 +226,51 @@ class HDF5File(Mapping):
 
         # Verify that the path points to a valid HDF5 file
         if os.path.isdir(path):
-            raise OSError('The path points to a directory, not a file.')
+            raise OSError(
+                'The path points to a directory, not a file.'
+                )
         filetype = os.path.splitext(path)[-1]
         if filetype != '.h5':
-            raise OSError(f'The path points to a {filetype} file, not an .h5 one.')
+            raise OSError(
+                f'The path points to a {filetype} file, not an .h5 one.'
+                )
+        
+        # create the file if it does not exist
+        if not os.path.exists(self.path):
+            self.create_blank_file()
 
-        # perform all checks that require the file to be opened on the root process
-        if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
-            if not os.path.exists(path):
-                if read_only:
-                    raise OSError(f'The file at the path {path} does not exist, and the file is read-only, so it cannot be created.')
-                if verbose:
-                    warnings.warn('There is no file at the specified path. A blank file has been created for you.')
-                with tb.open_file(self.path, 'w') as f: 
-                    pass
-            
-            # check that the root_uep exists
-            root_uep_exits = True
-            with tb.open_file(path, 'r') as f:
-                if root_uep != '/' and not root_uep in f.root:
-                    root_uep_exits = False
+        # check that the root_uep exists
+        root_uep_exits = True
+        with tb.open_file(self.path, 'r') as f:
+            if self.root_uep != '/' and not self.root_uep in f.root:
+                root_uep_exits = False
 
-            # create the root_uep if it does not exist and the file is not read-only
-            if not root_uep_exits:
-                if read_only:
-                    raise OSError(f'The root_uep {root_uep} does not exist, and the file is read-only, so it cannot be created.')
-                if verbose:
-                    warnings.warn('The root_uep does not exist. A blank group has been created for you.')
-                with tb.open_file(path, 'a') as f:
-                    f.create_group(f.root, root_uep)
+        # create the root_uep if it does not exist and the file is not read-only
+        if not root_uep_exits:
+            if self.read_only:
+                raise OSError(
+                    f'The root_uep {self.root_uep} does not exist, and the file is read-only, so it cannot be created.'
+                    )
+            if self.verbose:
+                rank_zero_warn(
+                    'The root_uep does not exist. A blank group has been created for you.'
+                    )
+            with tb.open_file(self.path, 'a') as f:
+                f.create_group(f.root, self.root_uep)
+
+
+    @rank_zero_only
+    def create_blank_file(self) -> None:
+        if self.read_only:
+            raise OSError(
+                f'The file at the path {self.path} does not exist, and the file is read-only, so it cannot be created.'
+                )
+        if self.verbose:
+            rank_zero_warn(
+                'There is no file at the specified path. A blank file has been created for you.'
+                )
+        with tb.open_file(self.path, 'w') as f: 
+            pass
                 
 
     def __len__(self) -> int:
@@ -355,6 +373,7 @@ class HDF5File(Mapping):
                 yield group._v_name
 
 
+    @rank_zero_only
     def create_blank_table(
             self, 
             table_name : str, 
@@ -400,6 +419,7 @@ class HDF5File(Mapping):
                 )
             
     
+    @rank_zero_only
     def table_from_struct(
             self, 
             table_name : str, 
@@ -455,6 +475,7 @@ class HDF5File(Mapping):
             f.root[table_name].append(data)
 
 
+    @rank_zero_only
     def table_from_csv(
             self,
             csv_file : str, 
@@ -557,6 +578,19 @@ class HDF5File(Mapping):
             raise ValueError(f'The node {node_name} does not exist in {self.path}.')
         with tb.open_file(self.path, 'a', root_uep=self.root_uep) as f:
             f.remove_node(f.root, node_name, recursive=True)
+
+    
+    def read(self):
+        """
+        Read the entire file into memory.
+
+        Returns:
+        -------
+        np.ndarray: 
+            The entire file as a structured numpy array.
+        """
+        with tb.open_file(self.path, 'r', root_uep=self.root_uep) as f:
+            return f.root.read()
     
 
 
