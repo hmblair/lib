@@ -9,6 +9,7 @@ from collections.abc import Mapping, Sequence
 import warnings
 import torch
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
+import time
 
 
 class TableSequence(Mapping, Sequence):
@@ -227,6 +228,9 @@ class HDF5File(Mapping):
         # create the file if it does not exist
         if not os.path.exists(self.path):
             self.create_blank_file()
+            # wait for the file to be created before proceeing, since the other
+            # processes will try to open it
+            time.sleep(5) 
 
         # Verify that the path points to a valid HDF5 file
         if os.path.isdir(path):
