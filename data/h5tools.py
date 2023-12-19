@@ -227,35 +227,10 @@ class HDF5File(Mapping):
 
         # create the file if it does not exist
         if not os.path.exists(self.path):
-            self.create_blank_file()
-            # wait for the file to be created before proceeing, since the other
-            # processes will try to open it
-            time.sleep(5) 
+            self.create_blank_file() 
 
-        # Verify that the path points to a valid HDF5 file
-        if os.path.isdir(path):
-            raise OSError(
-                'The path points to a directory, not a file.'
-                )
-        filetype = os.path.splitext(path)[-1]
-        if filetype != '.h5':
-            raise OSError(
-                f'The path points to a {filetype} file, not an .h5 one.'
-                )
-        
-        # check that the root_uep exists
-        root_uep_exits = True
-        with tb.open_file(self.path, 'r') as f:
-            if self.root_uep != '/' and not self.root_uep in f.root:
-                root_uep_exits = False
-
-        # create the root_uep if it does not exist and the file is not read-only
-        if not root_uep_exits:
-            if self.verbose:
-                    rank_zero_warn(
-                        'The root_uep does not exist. A blank group has been created for you.'
-                        )
-            self.create_blank_group(self.root_uep)
+        # verify that the file is valid
+        self.verify_file()
 
 
     @rank_zero_only
@@ -280,6 +255,22 @@ class HDF5File(Mapping):
                 )
         with tb.open_file(self.path, 'a') as f:
             f.create_group(f.root, group_name)
+
+
+    @rank_zero_only
+    def verify_file(self) -> None:
+        """
+        Verify that the file is valid, by opening it and closing it. Then, 
+        check whether the root_uep exists. If it does not, create it.
+        """
+        with tb.open_file(self.path, 'r') as f:
+            root_uep_exists = self.root_uep == '/' or self.root_uep in f.root
+        if not root_uep_exists:
+            if self.verbose:
+                rank_zero_warn(
+                    'The root_uep does not exist. A blank group has been created for you.'
+                    )
+            self.create_blank_group(self.root_uep)      
                 
 
     def __len__(self) -> int:
