@@ -107,7 +107,6 @@ class DistributedPredictionWriter(BasePredictionWriter, metaclass=ABCMeta):
         to a file on the root process.
         """
         prediction = self._gather(trainer, *args, **kwargs)
-        breakpoint()
         if trainer.global_rank == 0:
             self._write(prediction)
 
@@ -173,7 +172,11 @@ class DistributedPredictionWriterToH5(DistributedPredictionWriter):
         # get the length of the sequences, in order to save them to the correct
         # table in the HDF5 file.
 
+        breakpoint()
+
         x, y, *_ = prediction
+
+        breakpoint()
 
         seq_len = x.shape[-1]
         dt=[('input', x.dtype, (seq_len,)), ('output', y.dtype)]
