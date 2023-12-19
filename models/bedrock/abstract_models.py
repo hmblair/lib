@@ -456,33 +456,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
             True if the tensor is constant, else False.
         """
         return torch.allclose(x, x[0], atol=eps)
-    
 
-    def _get_mem_usage(self) -> float:
-        """
-        Retrieves the current memory usage of the entire system.
-
-        Returns:
-        --------
-        float: 
-            The current memory usage.
-        """
-        process = psutil.Process()
-        return float(process.memory_info().rss)
-    
-
-    def _get_gpu_mem_usage(self) -> tuple[float, float]:
-        """
-        Retrieves the current absolute and relative memory usage of the GPU.
-
-        Returns:
-        --------
-        tuple[float, float]: 
-            The current absolute and relative GPU memory usage.
-        """
-        available, total = torch.cuda.mem_get_info()
-        return float(available), float(available) / float(total)
-    
     
     def _get_lr(self) -> float:
         """
