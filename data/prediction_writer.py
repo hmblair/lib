@@ -151,12 +151,9 @@ class DistributedPredictionWriterToH5(DistributedPredictionWriter):
         super().__init__()
         # check that the output file does not already exist, and create a new
         # file at the specified path.
-        if os.path.exists(path):
-            if overwrite:
-                os.remove(path)
-            else:
-                raise ValueError(f'The output file {path} already exists.')
         self.table_group = HDF5File(path, root_uep=root_uep)
+        if overwrite:
+            self.table_group.clear()
 
 
     def _write(self, prediction : tuple[np.ndarray, np.ndarray]) -> None:
