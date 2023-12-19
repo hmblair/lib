@@ -56,6 +56,8 @@ class DistributedPredictionWriter(BasePredictionWriter, metaclass=ABCMeta):
         else:
             gathered_predictions = [tensor]
 
+        breakpoint()
+
         return gathered_predictions
 
 
