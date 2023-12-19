@@ -178,11 +178,10 @@ class DistributedPredictionWriterToH5(DistributedPredictionWriter):
 
         dt=[('input', x.dtype, x_shape), ('output', y.dtype, y_shape)]
         data = np.zeros((b,), dtype=dt)
-        breakpoint()
         data['input'] = x
         data['output'] = y
 
-        seq_len = str(seq_len)
+        seq_len = str(x_shape)
         if seq_len not in self.table_group:
             self.table_group.table_from_struct(
                 table_name=seq_len, 
