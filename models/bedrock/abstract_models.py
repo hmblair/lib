@@ -215,6 +215,16 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         # get the input from the batch
         x, y = self._get_inputs_and_outputs(batch) 
 
+        # log the memory usage
+        mem_usage = self._get_mem_usage()
+        self._log('mem_usage', mem_usage, on_epoch=False)
+
+        # log the GPU memory usage, if available
+        if self.device.type == 'cuda':
+            abs_gpu_mem_usage, rel_gpu_mem_usage = self._get_gpu_mem_usage()
+            self._log('abs_gpu_mem_usage', abs_gpu_mem_usage, on_epoch=False)
+            self._log('rel_gpu_mem_usage', rel_gpu_mem_usage, on_epoch=False)
+
         # return the input and the predicted output
         return x, self(x), y
 
