@@ -8,6 +8,10 @@ import psutil
 from .hook import HookList, patch_and_register_layer_hooks
 from .weight_init import xavier_init
 
+# ignore the following warnings
+import warnings
+warnings.filterwarnings("ignore", ".*does not have many workers.*")
+
 
 def module_requires_grad(module: torch.nn.Module) -> bool:
     """
