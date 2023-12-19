@@ -152,8 +152,8 @@ class DistributedPredictionWriterToH5(DistributedPredictionWriter):
         # check that the output file does not already exist, and create a new
         # file at the specified path.
         self.table_group = HDF5File(path, root_uep=root_uep)
-        if overwrite:
-            self.table_group.clear()
+        # if overwrite:
+        #     self.table_group.clear()
 
 
     def _write(self, prediction : tuple[np.ndarray, np.ndarray]) -> None:
