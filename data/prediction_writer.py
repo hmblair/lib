@@ -166,7 +166,7 @@ class DistributedPredictionWriterToH5(DistributedPredictionWriter):
         # get the length of the sequences, in order to save them to the correct
         # table in the HDF5 file.
 
-        x, y = prediction
+        x, y, *_ = prediction
 
         seq_len = x.shape[-1]
         dt=[('input', x.dtype, (seq_len,)), ('output', y.dtype)]
