@@ -239,7 +239,6 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         _ = self._compute_and_log_losses(batch, 'test') # compute the losses
 
 
-    @log_mem_usage
     def predict_step(
             self, 
             batch : Any, 
