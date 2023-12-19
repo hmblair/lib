@@ -224,6 +224,10 @@ class HDF5File(Mapping):
         self.read_only = read_only
         self.verbose = verbose
 
+        # create the file if it does not exist
+        if not os.path.exists(self.path):
+            self.create_blank_file()
+
         # Verify that the path points to a valid HDF5 file
         if os.path.isdir(path):
             raise OSError(
@@ -235,10 +239,6 @@ class HDF5File(Mapping):
                 f'The path points to a {filetype} file, not an .h5 one.'
                 )
         
-        # create the file if it does not exist
-        if not os.path.exists(self.path):
-            self.create_blank_file()
-
         # check that the root_uep exists
         root_uep_exits = True
         with tb.open_file(self.path, 'r') as f:
@@ -247,16 +247,11 @@ class HDF5File(Mapping):
 
         # create the root_uep if it does not exist and the file is not read-only
         if not root_uep_exits:
-            if self.read_only:
-                raise OSError(
-                    f'The root_uep {self.root_uep} does not exist, and the file is read-only, so it cannot be created.'
-                    )
             if self.verbose:
-                rank_zero_warn(
-                    'The root_uep does not exist. A blank group has been created for you.'
-                    )
-            with tb.open_file(self.path, 'a') as f:
-                f.create_group(f.root, self.root_uep)
+                    rank_zero_warn(
+                        'The root_uep does not exist. A blank group has been created for you.'
+                        )
+            self.create_blank_group(self.root_uep)
 
 
     @rank_zero_only
@@ -271,6 +266,16 @@ class HDF5File(Mapping):
                 )
         with tb.open_file(self.path, 'w') as f: 
             pass
+
+    
+    @rank_zero_only
+    def create_blank_group(self, group_name : str) -> None:
+        if self.read_only:
+            raise OSError(
+                f'The file is read-only, so a blank group cannot be created.'
+                )
+        with tb.open_file(self.path, 'a') as f:
+            f.create_group(f.root, group_name)
                 
 
     def __len__(self) -> int:
