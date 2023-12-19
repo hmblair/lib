@@ -45,8 +45,13 @@ class DistributedPredictionWriter(BasePredictionWriter, metaclass=ABCMeta):
             tensor : torch.Tensor
             ) -> torch.Tensor:
         if torch.distributed.is_initialized():
-            gathered_predictions = [torch.zeros_like(tensor) for _ in range(torch.distributed.get_world_size())]
-            torch.distributed.all_gather(gathered_predictions, tensor)
+            gathered_predictions = [
+                torch.zeros_like(tensor) for _ in range(torch.distributed.get_world_size())
+                ]
+            torch.distributed.all_gather(
+                gathered_predictions, 
+                tensor.contiguous()
+                )
         else:
             gathered_predictions = [tensor]
 
