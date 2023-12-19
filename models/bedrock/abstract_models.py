@@ -33,6 +33,60 @@ def module_requires_grad(module: torch.nn.Module) -> bool:
 
 
 
+def get_mem_usage(self) -> float:
+    """
+    Retrieves the current memory usage of the entire system.
+
+    Returns:
+    --------
+    float: 
+        The current memory usage.
+    """
+    process = psutil.Process()
+    return float(process.memory_info().rss)
+
+
+def get_gpu_mem_usage(self) -> tuple[float, float]:
+    """
+    Retrieves the current absolute and relative memory usage of the GPU.
+
+    Returns:
+    --------
+    tuple[float, float]: 
+        The current absolute and relative GPU memory usage.
+    """
+    available, total = torch.cuda.mem_get_info()
+    return float(available), float(available) / float(total)
+
+
+def log_mem_usage(f : Callable) -> Callable:
+    """
+    A decorator to log the memory usage of the system after the function is
+    called.
+
+    Parameters:
+    ----------
+    f (Callable): 
+        The function to be decorated.
+
+    Returns:
+    --------
+    Callable: 
+        The decorated function.
+    """
+    def wrapper(self, *args, **kwargs):
+        result = f(self, *args, **kwargs)
+        mem_usage = get_mem_usage()
+        self._log('mem_usage', mem_usage, on_epoch=False)
+        if self.device.type == 'cuda':
+            abs_gpu_mem_usage, rel_gpu_mem_usage = get_gpu_mem_usage()
+            self._log('abs_gpu_mem_usage', abs_gpu_mem_usage, on_epoch=False)
+            self._log('rel_gpu_mem_usage', rel_gpu_mem_usage, on_epoch=False)
+        return result
+    return wrapper
+
+
+
 from abc import ABCMeta, abstractmethod
 class WeightInitialisationMetaClass(ABCMeta):
     """
@@ -116,6 +170,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
                 xavier_init(m)
 
 
+    @log_mem_usage
     def training_step(
             self, 
             batch : Any, 
@@ -142,20 +197,11 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         # compute and log the learning rate
         lr = self._get_lr() 
         self._log('lr', lr, on_epoch=False) 
-
-        # compute and log the memory usage
-        mem_usage = self._get_mem_usage() 
-        self._log('mem_usage', mem_usage, on_epoch=False)
-
-        # compute and log the GPU memory usage, if available
-        if self.device.type == 'cuda':
-            abs_gpu_mem_usage, rel_gpu_mem_usage = self._get_gpu_mem_usage()
-            self._log('abs_gpu_mem_usage', abs_gpu_mem_usage, on_epoch=False)
-            self._log('rel_gpu_mem_usage', rel_gpu_mem_usage, on_epoch=False)
         
         return loss
     
 
+    @log_mem_usage
     def validation_step(
             self, 
             batch : Any, 
@@ -174,6 +220,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         _ = self._compute_and_log_losses(batch, 'val') # compute the losses
 
     
+    @log_mem_usage
     def test_step(
             self, 
             batch : Any, 
@@ -192,6 +239,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         _ = self._compute_and_log_losses(batch, 'test') # compute the losses
 
 
+    @log_mem_usage
     def predict_step(
             self, 
             batch : Any, 
@@ -214,16 +262,6 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         """ 
         # get the input from the batch
         x, y = self._get_inputs_and_outputs(batch) 
-
-        # log the memory usage
-        mem_usage = self._get_mem_usage()
-        self._log('mem_usage', mem_usage, on_epoch=False)
-
-        # log the GPU memory usage, if available
-        if self.device.type == 'cuda':
-            abs_gpu_mem_usage, rel_gpu_mem_usage = self._get_gpu_mem_usage()
-            self._log('abs_gpu_mem_usage', abs_gpu_mem_usage, on_epoch=False)
-            self._log('rel_gpu_mem_usage', rel_gpu_mem_usage, on_epoch=False)
 
         # return the input and the predicted output
         return x, self(x), y
