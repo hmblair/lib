@@ -636,7 +636,8 @@ class HDF5File(Mapping):
         tables = ''.join([f'{key}, of length {len(self[key])}\n    ' for key in self])
         return 'A HDF5File object containing the following tables:\n    ' + tables
     
-
+    
+    @rank_zero_only
     def delete_node(self, node_name : str) -> None:
         """
         Delete the node with the given name.
@@ -679,7 +680,7 @@ class HDF5File(Mapping):
         with tb.open_file(self.path, 'r', root_uep=self.root_uep) as f:
             return f.root.get_filesize()
         
-        
+
     def clear(self):
         """
         Delete all nodes in the file.
