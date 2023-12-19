@@ -56,8 +56,6 @@ class DistributedPredictionWriter(BasePredictionWriter, metaclass=ABCMeta):
         else:
             gathered_predictions = [tensor]
 
-        breakpoint()
-
         return gathered_predictions
 
 
@@ -109,6 +107,7 @@ class DistributedPredictionWriter(BasePredictionWriter, metaclass=ABCMeta):
         to a file on the root process.
         """
         prediction = self._gather(trainer, *args, **kwargs)
+        breakpoint()
         if trainer.global_rank == 0:
             self._write(prediction)
 
