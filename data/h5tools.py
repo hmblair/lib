@@ -12,6 +12,41 @@ from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zer
 import time
 
 
+
+import math
+
+class BytesH:
+    """
+    A class to represent a memory size in bytes, in a human-readable format.
+
+    Parameters:
+    -----------
+    num_bytes (float):
+        The number of bytes to be represented.
+
+    Raises:
+    -------
+    ValueError:
+        If the number of bytes is negative.
+    """
+    def __init__(self, num_bytes : float):
+        if num_bytes < 0:
+            raise ValueError('The number of bytes cannot be negative.')
+        self.item = num_bytes
+        self.size_names = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+
+    def __repr__(self):
+        if self.item == 0:
+            return '0 B'
+        i = math.floor(
+            math.log(self.item, 1024)
+            )
+        p = math.pow(1024, i)
+        s = round(self.item / p, 2)
+        return "%s %s" % (s, self.size_names[i])
+
+
+
 class TableSequence(Mapping, Sequence):
     """
     A class that allows for indexing and slicing of HDF5 tables, without having 
@@ -38,21 +73,21 @@ class TableSequence(Mapping, Sequence):
             table_name : str,
             read_only : bool = False,
             ) -> None:
-        # Verify that the path points to a valid HDF5 file
-        if os.path.isdir(path):
-            raise OSError('The path points to a directory, not a file.')
-        filetype = os.path.splitext(path)[-1]
-        if filetype != '.h5':
-            raise OSError(f'The path points to a {filetype} file, not an .h5 one.')
-        self.path = path
-        self.root_uep = root_uep
-        self.read_only = read_only
+        # Verify that the path points to a valid HDF5 file, by opening and
+        # closing it
+        with tb.open_file(path, 'r') as f:
+            pass
 
         # Verify that the table indeed belongs to the file
         with tb.open_file(path, 'r', root_uep=root_uep) as f:
             if not table_name in f.root:
                 raise ValueError(f'The table {table_name} does not exist in {path}.')
         self.table_name = table_name
+
+        # store the arguments
+        self.path = path
+        self.root_uep = root_uep
+        self.read_only = read_only
 
 
     def __getitem__(self, idx : Union[int, slice, str]) -> np.ndarray:
@@ -142,15 +177,30 @@ class TableSequence(Mapping, Sequence):
         whether the data is compatible with the table, but it will not throw
         an error if it is not.
 
+        Since PyTables does not support appending to a table in parallel, this
+        method will throw an error multiple processes try to append at the same
+        time.
+
         Parameters:
         ----------
         data (np.ndarray): 
             The data to append to the table.
+
+        Raises:
+        -------
+        OSError: 
+            If the file is read-only.
         """
         if self.read_only:
-            raise ValueError('The file is read-only.')
+            raise OSError(
+                'The file is read-only, so you cannot append any data.'
+                )
+        
         with tb.open_file(self.path, 'a', root_uep=self.root_uep) as f:
-            f.root[self.table_name].append(data)
+            table = f.root[self.table_name]
+            if data.dtype != table.dtype:
+                raise ValueError("Data dtype does not match table dtype.")
+            table.append(data)
 
 
     def size_in_memory(self) -> int:
@@ -188,8 +238,9 @@ class TableSequence(Mapping, Sequence):
 class HDF5File(Mapping):
     """
     A class that enables working with HDF5 files, especially ones that contain
-    groups of tables. This class is tuned
-    to work in distributed settings as well.
+    groups of tables. This class is tuned to work in distributed settings as 
+    well. Any operation that requires creating the file or verifying that
+    the file is valid is only done on rank 0.
 
     Parameters:
     ----------
@@ -199,17 +250,17 @@ class HDF5File(Mapping):
         The root user entry point. Setting this means that only tables and 
          groups within this group are visible to the class instance. Defaults to
         '/'.
-    create_file_if_not_exists (bool, optional):
-        Whether to create a blank file at the specified path if one does not 
-        already exist. Defaults to True. Setting this to false is helpful
-        for debugging purposes.
     verbose (bool, optional):
         Whether to print warnings and other messages. Defaults to False.
+    read_only (bool, optional):
+        Whether to open the file in read-only mode. Defaults to False.
 
     Raises:
     -------
     OSError: 
-        If the path does not point to a valid HDF5 file.
+        If the path does not point to a valid HDF5 file, or if the file does not
+        exist and the class is set to read-only, or if the root_uep does not
+        exist in the file and the class is set to read-only.
     """
     def __init__(
             self, 
@@ -235,6 +286,14 @@ class HDF5File(Mapping):
 
     @rank_zero_only
     def create_blank_file(self) -> None:
+        """
+        Create a blank HDF5 file at the specified path.
+
+        Raises:
+        -------
+        OSError: 
+            If the file does not exist, and the class is set to read-only.
+        """
         if self.read_only:
             raise OSError(
                 f'The file at the path {self.path} does not exist, and the file is read-only, so it cannot be created.'
@@ -249,6 +308,19 @@ class HDF5File(Mapping):
     
     @rank_zero_only
     def create_blank_group(self, group_name : str) -> None:
+        """
+        Create a blank group in the file.
+
+        Parameters:
+        ----------
+        group_name (str): 
+            The name of the group to create.
+
+        Raises:
+        -------
+        OSError: 
+            If the file is read-only.
+        """
         if self.read_only:
             raise OSError(
                 f'The file is read-only, so the blank group {group_name} cannot be created.'
@@ -323,9 +395,9 @@ class HDF5File(Mapping):
 
         Returns:
         -------
-        TableSequence | GroupedTable | np.ndarray: 
+        TableSequence | HDF5File | np.ndarray: 
             If the key points to a table, a TableSequence object containing the
-            table. If the key points to a group, a GroupedTable object
+            table. If the key points to a group, a HDF5File object
             containing the group. Else, if the key points to an Array,
             the Array is returned in memory as a numpy array.
         """
@@ -546,8 +618,10 @@ class HDF5File(Mapping):
         if not os.path.isdir(path):
             raise OSError('The path must point to a directory.')
 
-        for table_name in self:
-            self[table_name].to_csv(os.path.join(path, table_name + '.csv'))
+        for table_name, table in self.values():
+            table.to_csv(
+                os.path.join(path, table_name + '.csv')
+                )
 
 
     def __repr__(self) -> str:
@@ -560,7 +634,7 @@ class HDF5File(Mapping):
             A string representation of the file.
         """
         tables = ''.join([f'{key}, of length {len(self[key])}\n    ' for key in self])
-        return 'A GroupedTables object containing the following tables:\n    ' + tables
+        return 'A HDF5File object containing the following tables:\n    ' + tables
     
 
     def delete_node(self, node_name : str) -> None:
@@ -591,6 +665,20 @@ class HDF5File(Mapping):
         """
         with tb.open_file(self.path, 'r', root_uep=self.root_uep) as f:
             return f.root.read()
+
+     
+    def size_in_memory(self) -> int:
+        """
+        Get the size of the file in memory, in bytes.
+
+        Returns:
+        -------
+        int: 
+            The size of the file in memory.
+        """
+        with tb.open_file(self.path, 'r', root_uep=self.root_uep) as f:
+            return f.root.get_filesize()
+
     
 
 
