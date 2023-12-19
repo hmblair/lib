@@ -120,7 +120,7 @@ class DistributedPredictionWriter(BasePredictionWriter, metaclass=ABCMeta):
 
 
 
-from h5tools import HDF5File
+from .h5tools import HDF5File
 class DistributedPredictionWriterToH5(DistributedPredictionWriter):
     """
     A writer class for saving predictions to an HDF5 file when making 
