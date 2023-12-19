@@ -11,8 +11,6 @@ import torch
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
 import time
 
-
-
 import math
 
 class BytesH:
@@ -81,7 +79,9 @@ class TableSequence(Mapping, Sequence):
         # Verify that the table indeed belongs to the file
         with tb.open_file(path, 'r', root_uep=root_uep) as f:
             if not table_name in f.root:
-                raise ValueError(f'The table {table_name} does not exist in {path}.')
+                raise ValueError(
+                    f'The table {table_name} does not exist in {path}.'
+                    )
         self.table_name = table_name
 
         # store the arguments
@@ -678,6 +678,16 @@ class HDF5File(Mapping):
         """
         with tb.open_file(self.path, 'r', root_uep=self.root_uep) as f:
             return f.root.get_filesize()
+        
+        
+    def clear(self):
+        """
+        Delete all nodes in the file.
+        """
+        if self.read_only:
+            raise ValueError('The file is read-only.')
+        for node_name in self:
+            self.delete_node(node_name)
 
     
 
