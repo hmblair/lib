@@ -266,10 +266,6 @@ class HDF5File(Mapping):
         with tb.open_file(self.path, 'r') as f:
             root_uep_exists = self.root_uep == '/' or self.root_uep in f.root
         if not root_uep_exists:
-            if self.read_only:
-                raise OSError(
-                    f'The root_uep does not exist, and the file is read-only, so it cannot be created.'
-                    )
             if self.verbose:
                 rank_zero_warn(
                     'The root_uep does not exist. A blank group has been created for you.'
