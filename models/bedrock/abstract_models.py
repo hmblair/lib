@@ -33,7 +33,7 @@ def module_requires_grad(module: torch.nn.Module) -> bool:
 
 
 
-def get_mem_usage(self) -> float:
+def get_mem_usage() -> float:
     """
     Retrieves the current memory usage of the entire system.
 
@@ -46,7 +46,7 @@ def get_mem_usage(self) -> float:
     return float(process.memory_info().rss)
 
 
-def get_gpu_mem_usage(self) -> tuple[float, float]:
+def get_gpu_mem_usage() -> tuple[float, float]:
     """
     Retrieves the current absolute and relative memory usage of the GPU.
 
@@ -83,6 +83,36 @@ def log_mem_usage(f : Callable) -> Callable:
             self._log('abs_gpu_mem_usage', abs_gpu_mem_usage, on_epoch=False)
             self._log('rel_gpu_mem_usage', rel_gpu_mem_usage, on_epoch=False)
         return result
+    return wrapper
+
+
+
+def catch_and_log_errors(f):
+    """
+    A decorator to catch any errors that occur in the given function and log
+    them. If the model has a log method, the error is logged using that method.
+    Otherwise, the error is printed.
+
+    Parameters:
+    ----------
+    f (Callable): 
+        The function to be decorated.
+
+    Returns:
+    --------
+    Callable: 
+        The decorated function.
+    """
+    def wrapper(self, *args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            # Log the error
+            if hasattr(self, 'log'):
+                self.log(f'{f.__name__}_error', str(e), on_epoch=False)
+            else:
+                print(f"Error in {f.__name__}: {e}")
+            raise
     return wrapper
 
 
@@ -162,14 +192,20 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         initialization method, you can override this method in your subclass.
         """
         if not self.modules():
-            rank_zero_warn(
-                'No modules were found in the model. The weights will not be initialized.'
+            raise RuntimeError(
+                'No modules found in the model for weight initialization.'
                 )
-        for m in self.modules():
-            if not m.children() and module_requires_grad(m):
-                xavier_init(m)
+        try:
+            for m in self.modules():
+                if not m.children() and module_requires_grad(m):
+                    xavier_init(m)
+        except Exception as e:
+            raise RuntimeError(
+                'An error occurred during weight initialization.'
+                ) from e
 
 
+    @catch_and_log_errors
     @log_mem_usage
     def training_step(
             self, 
@@ -201,6 +237,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         return loss
     
 
+    @catch_and_log_errors
     @log_mem_usage
     def validation_step(
             self, 
@@ -220,6 +257,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         _ = self._compute_and_log_losses(batch, 'val') # compute the losses
 
     
+    @catch_and_log_errors
     @log_mem_usage
     def test_step(
             self, 
@@ -239,6 +277,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         _ = self._compute_and_log_losses(batch, 'test') # compute the losses
 
 
+    @catch_and_log_errors
     def predict_step(
             self, 
             batch : Any, 
