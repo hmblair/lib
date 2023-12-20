@@ -108,11 +108,11 @@ def catch_and_log_errors(f):
             return f(*args, **kwargs)
         except Exception as e:
             # Log the error
-            if hasattr(self, 'log'):
-                self.log(f'{f.__name__}_error', str(e), on_epoch=False)
-            else:
-                print(f"Error in {f.__name__}: {e}")
-            raise
+            # if hasattr(self, 'logger'):
+            #     self.logger.experiment.add_text('Error Log', str(e), global_step=batch_idx)
+            # else:
+            print(f"Error in {f.__name__}: {e}")
+            raise e
     return wrapper
 
 
