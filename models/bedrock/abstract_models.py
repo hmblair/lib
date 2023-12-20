@@ -103,7 +103,7 @@ def catch_and_log_errors(f):
     Callable: 
         The decorated function.
     """
-    def wrapper(self, *args, **kwargs):
+    def wrapper(*args, **kwargs):
         try:
             return f(*args, **kwargs)
         except Exception as e:
