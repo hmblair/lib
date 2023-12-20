@@ -206,7 +206,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
 
 
     @catch_and_log_errors
-    @log_mem_usage
+    # @log_mem_usage
     def training_step(
             self, 
             batch : Any, 
@@ -238,7 +238,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
     
 
     @catch_and_log_errors
-    @log_mem_usage
+    # @log_mem_usage
     def validation_step(
             self, 
             batch : Any, 
@@ -258,7 +258,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
 
     
     @catch_and_log_errors
-    @log_mem_usage
+    # @log_mem_usage
     def test_step(
             self, 
             batch : Any, 
@@ -303,14 +303,6 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
 
         # return the input and the predicted output
         return x, self(x), y
-
-
-    def on_train_epoch_start(self) -> None:
-        """
-        Print a new line at the start of each training epoch, to separeate the 
-        correspdonding progress bars.
-        """
-        rank_zero_info('\n')
     
 
     def _compute_and_log_losses(
