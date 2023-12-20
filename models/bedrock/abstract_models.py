@@ -11,6 +11,7 @@ from .weight_init import xavier_init
 # ignore the following warnings
 import warnings
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
+warnings.filterwarnings("ignore", "Your `IterableDataset` has `__len__` defined*")
 
 
 def module_requires_grad(module: torch.nn.Module) -> bool:
