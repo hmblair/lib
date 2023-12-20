@@ -12,7 +12,6 @@ torch
 tensordict
 pytorch-lightning
 jsonargparse[signatures]>=4.18.0
-tensorboardX
 wandb
 
 # -i https://pypi.nvidia.com
