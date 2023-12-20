@@ -18,6 +18,8 @@ class DenseNetwork(nn.Module):
         A list of hidden layer sizes. Defaults to an empty list.
     bias (bool): 
         Whether to use bias in the linear layers. Defaults to True.
+    dropout (float):
+        The dropout probability. Defaults to 0.0.
     activation (nn.Module): 
         The activation function to use. Defaults to nn.ReLU().
 
@@ -25,18 +27,10 @@ class DenseNetwork(nn.Module):
     ----------
     layers (nn.ModuleList): 
         The layers of the network.
+    dropout (nn.Dropout):
+        The dropout layer.
     activation (nn.Module): 
         The activation function to use.
-
-    Inherits:
-    ---------
-    nn.Module: 
-        The base PyTorch module class.
-
-    Methods:
-    --------
-    forward(): 
-        The forward pass of the model.
     """
     def __init__(
             self,
@@ -44,7 +38,8 @@ class DenseNetwork(nn.Module):
             out_size : int,
             hidden_sizes: list = [],
             bias : bool = True,
-            activation : nn.Module = nn.ReLU()
+            dropout : float = 0.0,
+            activation : nn.Module = nn.ReLU(),
             ) -> None:
         super().__init__()
 
@@ -58,14 +53,16 @@ class DenseNetwork(nn.Module):
                 nn.Linear(l1, l2, bias)
                     )
 
-        # store the layers and activation
+        # store the layers, dropout, and activation
         self.layers = nn.ModuleList(layers)
+        self.dropout = nn.Dropout(dropout)
         self.activation = activation
 
 
     def forward(self, x : torch.Tensor) -> torch.Tensor:
         """
-        The forward pass of the model.
+        The forward pass of the model. The input has shape (*b, in_size), and
+        the output has shape (*b, out_size).
 
         Parameters:
         -----------
@@ -77,11 +74,14 @@ class DenseNetwork(nn.Module):
         torch.Tensor: 
             The output tensor.
         """
-        # apply each layer, save for the last, and activation
+        # apply each layer, save for the last, and corresponding dropout and 
+        # activation
         for layer in self.layers[:-1]:
-            x = self.activation(layer(x))
+            x = self.dropout(
+                self.activation(layer(x))
+                )
 
-        # apply the final layer, with no activation
+        # apply the final layer, with no activation or dropout
         x = self.layers[-1](x)
 
         # squeeze the final dimension if applicable
