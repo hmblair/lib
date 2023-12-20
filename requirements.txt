@@ -1,5 +1,7 @@
 # requirements.txt
 
+matplotlib
+
 psutil
 
 numpy
