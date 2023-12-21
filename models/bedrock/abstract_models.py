@@ -138,7 +138,12 @@ class WeightInitialisationMetaClass(ABCMeta):
         # class
         obj = type.__call__(cls, *args, **kwargs)
         # initialize the weights
-        obj._weight_init()
+        try:
+            obj._weight_init()
+        except Exception as e:
+            raise RuntimeError(
+                'The weights could not be initialized, since the _weight_init method is not implemented.'
+                ) from e
 
         return obj
 
