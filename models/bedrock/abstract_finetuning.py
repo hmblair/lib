@@ -122,6 +122,27 @@ class BaseFineTuningModel(BaseModel, metaclass=ABCMeta):
         by the child class.
         """
         return
+    
+
+    def load_weights_from_checkpoint(
+            self, 
+            model_class: type[nn.Module],
+            checkpoint_path: str,
+            ) -> None:
+        """
+        Loads a pre-trained model from a checkpoint. Because of the way PyTorch
+        Lightning loads models, you must pass in the model class as an argument
+        to this method.
+
+        Parameters:
+        -----
+        model_class (type[nn.Module]):
+            The class of the model to load.
+        checkpoint_path (str): 
+            The path to the checkpoint.
+        """
+        # load the pre-trained model from the checkpoint
+        return model_class.load_from_checkpoint(checkpoint_path) 
 
 
     def on_train_epoch_start(self) -> None:
