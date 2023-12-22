@@ -212,6 +212,8 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         """
         self.rank, self.world_size = self.distributed_info()
 
+        print('Rank:', self.rank, 'World size:', self.world_size)
+
         if stage == 'fit':
             self.data['train'] = self._create_datasets('train')
             self.data['validate'] = self._create_datasets('validate')
