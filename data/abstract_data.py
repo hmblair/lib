@@ -131,7 +131,12 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
 
 
     @abstractmethod
-    def _create_datasets(self, phase : str) -> Union[Sequence, Iterable]:
+    def _create_datasets(
+        self, 
+        phase : str, 
+        rank : int, 
+        world_size : int,
+        ) -> Union[Sequence, Iterable]:
         """
         Create a dataset for the specified phase.
 
@@ -140,6 +145,10 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         phase (str): 
             The phase for which to create the datasets. Can be one of 'train', 
             'val', 'test', or 'predict'.
+        rank (int):
+            The rank of the current process.
+        world_size (int):
+            The total number of processes.
 
         Returns:
         -------
@@ -210,15 +219,13 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         ValueError: 
             If the stage is not one of 'fit', 'validate', 'test', or 'predict'.
         """
-        self.rank, self.world_size = self.distributed_info()
-
-        print('Rank:', self.rank, 'World size:', self.world_size)
+        rank, world_size = self.distributed_info()
 
         if stage == 'fit':
-            self.data['train'] = self._create_datasets('train')
-            self.data['validate'] = self._create_datasets('validate')
+            self.data['train'] = self._create_datasets('train', rank, world_size)
+            self.data['validate'] = self._create_datasets('validate', rank, world_size)
         elif stage in ['test', 'validate', 'predict']:
-            self.data[stage] = self._create_datasets(stage)
+            self.data[stage] = self._create_datasets(stage, rank, world_size)
         else:
             raise ValueError(f'Invalid stage {stage}. The stage must be either "fit", "validate", "test" or "predict".')
 
