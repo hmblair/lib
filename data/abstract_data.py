@@ -94,6 +94,8 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
             self.rank = 0
             self.world_size = 1
 
+        print('Rank:', self.rank, 'World size:', self.world_size)
+
 
     @abstractmethod
     def _create_datasets(self, phase : str) -> Union[Sequence, Iterable]:
