@@ -9,6 +9,7 @@ from abc import ABCMeta, abstractmethod
 import warnings
 import os
 
+
 class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
     """
     Base class for Pytorch Lightning data modules that provides a standard
@@ -78,8 +79,8 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
             num_workers = os.cpu_count()
         self.num_workers = num_workers
 
-        self.rank = torch.distributed.get_rank() if torch.distributed.is_available() else 0
-        self.world_size = torch.distributed.get_world_size() if torch.distributed.is_available() else 1
+        # self.rank = torch.distributed.get_rank() if torch.distributed.is_available() else 0
+        # self.world_size = torch.distributed.get_world_size() if torch.distributed.is_available() else 1
 
         # # get the rank and world size from the trainer object, if it exists,
         # # otherwise set them to 0 and 1 respectively
@@ -97,7 +98,36 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         #     self.rank = 0
         #     self.world_size = 1
 
-        print('Rank:', self.rank, 'World size:', self.world_size)
+        # print('Rank:', self.rank, 'World size:', self.world_size)
+
+
+    def distributed_info(self) -> tuple[int, int]:
+        """
+        Returns the rank and world size of the current process. If this is 
+        called too early, before the trainer object has been created, the rank
+        is set to 0 and the world size is set to 1, which may cause issues with
+        distributed training.
+
+        Returns:
+        -------
+        tuple[int, int]: 
+            The rank and world size of the current process.
+        """
+        if self.trainer is not None:
+            rank = self.trainer.global_rank
+            world_size = self.trainer.world_size
+        else:
+            warnings.warn(
+                message = 'No trainer object found. Setting rank to 0 and world' \
+                    ' size to 1. To use distributed training, please pass this' \
+                    ' DataModule to a trainer object.', 
+                category = UserWarning, 
+                stacklevel = 2
+                )
+            rank = 0
+            world_size = 1
+
+        return rank, world_size
 
 
     @abstractmethod
@@ -180,6 +210,8 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         ValueError: 
             If the stage is not one of 'fit', 'validate', 'test', or 'predict'.
         """
+        self.rank, self.world_size = self.distributed_info()
+
         if stage == 'fit':
             self.data['train'] = self._create_datasets('train')
             self.data['validate'] = self._create_datasets('validate')
