@@ -78,21 +78,24 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
             num_workers = os.cpu_count()
         self.num_workers = num_workers
 
-        # get the rank and world size from the trainer object, if it exists,
-        # otherwise set them to 0 and 1 respectively
-        if self.trainer is not None:
-            self.rank = self.trainer.global_rank
-            self.world_size = self.trainer.world_size
-        else:
-            warnings.warn(
-                message = 'No trainer object found. Setting rank to 0 and world' \
-                    ' size to 1. To use distributed training, please pass this' \
-                    ' DataModule to a trainer object.', 
-                category = UserWarning, 
-                stacklevel = 2
-                )
-            self.rank = 0
-            self.world_size = 1
+        self.rank = torch.distributed.get_rank() if torch.distributed.is_available() else 0
+        self.world_size = torch.distributed.get_world_size() if torch.distributed.is_available() else 1
+
+        # # get the rank and world size from the trainer object, if it exists,
+        # # otherwise set them to 0 and 1 respectively
+        # if self.trainer is not None:
+        #     self.rank = self.trainer.global_rank
+        #     self.world_size = self.trainer.world_size
+        # else:
+        #     warnings.warn(
+        #         message = 'No trainer object found. Setting rank to 0 and world' \
+        #             ' size to 1. To use distributed training, please pass this' \
+        #             ' DataModule to a trainer object.', 
+        #         category = UserWarning, 
+        #         stacklevel = 2
+        #         )
+        #     self.rank = 0
+        #     self.world_size = 1
 
         print('Rank:', self.rank, 'World size:', self.world_size)
 
