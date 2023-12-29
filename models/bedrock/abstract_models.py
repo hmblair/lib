@@ -360,7 +360,14 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         raise NotImplementedError('The _compute_losses method must be implemented.')
     
 
-    def _log(self, name: str, value: torch.Tensor, on_epoch : bool = True, **kwargs) -> None:
+    def _log(
+        self, 
+        name: str, 
+        value: torch.Tensor, 
+        on_step : bool = True, 
+        on_epoch : bool = True, 
+        **kwargs,
+        ) -> None:
         """
         Logs the given name-value pair with additional optional keyword 
         arguments.
@@ -374,26 +381,16 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         **kwargs: 
             Additional optional keyword arguments.
         """
-        if on_epoch:
-            self.log(
-                name=name, 
-                value=value, 
-                prog_bar=True, 
-                sync_dist=True, 
-                on_epoch=True, 
-                on_step=False, 
-                **kwargs
-                )
-        else:
-            self.log(
-                name=name, 
-                value=value, 
-                prog_bar=True, 
-                sync_dist=True, 
-                on_epoch=False, 
-                on_step=True, 
-                **kwargs)
-
+        self.log(
+            name=name, 
+            value=value, 
+            prog_bar=True, 
+            sync_dist=True, 
+            on_epoch=on_epoch, 
+            on_step=on_step, 
+            **kwargs
+            )
+        
 
     def _get_inputs_and_outputs(self, batch : Any) -> tuple[torch.Tensor, torch.Tensor]:
         """
