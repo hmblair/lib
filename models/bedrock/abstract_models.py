@@ -159,9 +159,8 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
     pl.LightningModule: 
         Base class for all PyTorch Lightning models.
     """
-    def __init__(self, validate_losses : bool = True):
+    def __init__(self):
         super().__init__()
-        self.validate_losses = validate_losses
 
         # create a list to store any hooks that are registered
         self.hooks = HookList()
@@ -338,8 +337,6 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
 
         # loop through the losses, ensuring that they are valid and logging them
         for name, value in losses.items():
-            if self.validate_losses:
-                self._validate_losses(value, name) 
             self._log(phase + '_' + name, value) 
         return losses['loss']
 
@@ -396,30 +393,6 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
                 on_epoch=False, 
                 on_step=True, 
                 **kwargs)
-
-
-    def _validate_losses(self, loss : torch.Tensor, name : str) -> None:
-        """
-        Validates the loss value to ensure it is not NaN, infinite, or negative.
-
-        Parameters:
-        ----------
-        loss: 
-            The loss value to be validated.
-        name: 
-            The name of the loss value.
-
-        Raises:
-        -------
-        ValueError: 
-            If the loss value is NaN or infinite.
-        """
-        if loss.isnan():
-            raise ValueError(f'The {name} is NaN.')
-        if loss.isinf():
-            raise ValueError(f'The {name} is infinite.')
-        if loss < 0:
-            rank_zero_warn(f'The {name} is negative.')
 
 
     def _get_inputs_and_outputs(self, batch : Any) -> tuple[torch.Tensor, torch.Tensor]:
