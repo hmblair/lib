@@ -83,6 +83,7 @@ class LinearWarmupLR(WarmupAndDecayLRScheduler):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # scale down the learning rate by the number of warmup steps
         for group in self.optimizer.param_groups:
             group['lr'] = group['lr'] / (self.warmup_epochs + 1)
 
