@@ -45,7 +45,7 @@ class BytesH:
 
 
 
-class TableSequence(Mapping, Sequence):
+class HDF5Table(Mapping, Sequence):
     """
     A class that allows for indexing and slicing of HDF5 tables, without having 
     to open the table every time, so that the table behaves as a Sequence.
@@ -400,7 +400,7 @@ class HDF5File(Mapping):
         return sum([len(table) for table in self.walk_nodes('Table')])       
     
 
-    def __getitem__(self, key : str) -> TableSequence:
+    def __getitem__(self, key : str) -> HDF5Table:
         """
         Get the table or group with the given name.
 
@@ -419,7 +419,7 @@ class HDF5File(Mapping):
         """
         with tb.open_file(self.path, 'r', root_uep=self.root_uep) as f:
             if isinstance(f.root[key], tb.Table):
-                return TableSequence(self.path, self.root_uep, key)
+                return HDF5Table(self.path, self.root_uep, key)
             elif isinstance(f.root[key], tb.Array):
                 return f.root[key].read()
         return self.__class__(
