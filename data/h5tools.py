@@ -54,8 +54,12 @@ class TableSequence(Mapping, Sequence):
     ----------
     path (str): 
         The path to the HDF5 file containing the table.
+    root_uep (str):
+        The root user entry point.
     table_name (str): 
         The name of the table to index.
+    read_only (bool, optional):
+        Whether to open the file in read-only mode. Defaults to False.
 
     Raises:
     -------
@@ -216,6 +220,21 @@ class TableSequence(Mapping, Sequence):
             return f.root[self.table_name].get_filesize()
         
     
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Convert the table to a pandas DataFrame.
+
+        Returns:
+        -------
+        pd.DataFrame: 
+            The table as a pandas DataFrame.
+        """
+        with tb.open_file(self.path, 'r', root_uep=self.root_uep) as f:
+            return pd.DataFrame(
+                f.root[self.table_name].read()
+                )
+        
+    
     def to_csv(self, path : str) -> None:
         """
         Write the table to a CSV file. Unfortunately for now, this involves 
@@ -226,10 +245,7 @@ class TableSequence(Mapping, Sequence):
         path (str): 
             The path to write the CSV file to.
         """
-        with tb.open_file(self.path, 'r', root_uep=self.root_uep) as f:
-            pd.DataFrame(
-                f.root[self.table_name].read()
-                ).to_csv(path, index=False)
+        self.to_dataframe().to_csv(path, index=False)
 
 
 
@@ -725,3 +741,61 @@ class MappingIterableDataset(IterableDataset):
     
     def __len__(self) -> int:
         return math.ceil(self.mapping.num_rows() / (self.batch_size * self.world_size))
+    
+
+
+
+if __name__ == '__main__':
+    from .tokenizer import CharTokenizer
+    def embed_seq_col(data : np.ndarray) -> np.ndarray:
+        """
+        Pass the 'sequence' column of the data through an embedding.
+            
+        Parameters:
+        ----------
+        data (np.ndarray): 
+            The data to embed.
+
+        Returns:
+        -------
+        np.ndarray:
+            The data with the 'sequence' column embedded.
+        """
+        emb = CharTokenizer(dict_dir = None, A=0, C=1, G=2, U=3)
+        embedded_sequence = np.array(emb(data['sequence']))
+        seq_length = embedded_sequence.shape[1]
+        dt = [('seqs', np.int32, (seq_length,))] + [('reads', np.int32)]  # Add a new field for the embedded sequence
+        new_data = np.zeros(data.shape, dtype=dt)
+        new_data['seqs'] = embedded_sequence
+        new_data['reads'] = data['reads_2A3']
+
+        return new_data
+    
+    from time import time
+    path = '../Data/test.h5'
+    file = HDF5File(path)
+    if not 'train' in file:
+        file.table_from_csv(
+            '../Data/CSV/train.csv', 
+            'train', 
+            ['sequence', 'reads_2A3'],
+            transforms=[embed_seq_col]
+            )
+    
+
+    table_file = tb.open_file(path, 'r')
+    table = table_file.root.train
+    t = time()
+    for i in range(100):
+        table[i]
+    index = time() - t
+
+    t = time()
+    table[0:100]
+    slice = time() - t
+
+    print(index, slice)
+    print(index/slice)
+
+    table_file.close()
+    
