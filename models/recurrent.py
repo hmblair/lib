@@ -2,11 +2,13 @@
 
 import torch
 import torch.nn as nn
+from .transformers import MultiHeadSelfAttention
 
-class RNN(nn.Module):
+class BaseRNN(nn.Module):
     """
     A bidirectional encoder-decoder style recurrent neural network with an 
-    arbitrary number of hidden layers.
+    arbitrary number of hidden layers. This class prepares the base structure
+    for the RNN, but the actual forward pass is not defined.
 
     Parameters:
     -----------
@@ -45,8 +47,10 @@ class RNN(nn.Module):
 
     Methods:
     -------- 
-    forward():
-        The forward pass of the model.
+    encode():
+        Encodes the input tensor.
+    decode():
+        Decodes the input tensor.
     """
     def __init__(
             self,
@@ -65,14 +69,19 @@ class RNN(nn.Module):
         varieties = {
             'rnn' : nn.RNN,
             'gru' : nn.GRU,
-            'lstm' : nn.LSTM
+            'lstm' : nn.LSTM,
             }
         if variety not in varieties.keys():
-            raise ValueError(f'{variety} is not a valid variety. The valid varieties are {list(varieties.keys())}')
+            raise ValueError(
+                f'{variety} is not a valid variety. The valid varieties are {list(varieties.keys())}.'
+                ) 
         self.module = varieties[variety]
 
         # an embedding layer to embed the input
         self.embedding = nn.Embedding(num_embeddings, embedding_dim)
+
+        # store the hidden size
+        self.hidden_size = hidden_size
 
         # the encoder and decoder RNNs
         self.encoder = self._construct_rnn(
@@ -91,6 +100,55 @@ class RNN(nn.Module):
 
         # a linear layer to map to the output dimension
         self.linear =nn.Linear(hidden_size * 2, output_dim)
+
+    
+    def encode(self, x : torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Encodes the input tensor.
+
+        Parameters:
+        -----------
+        x (torch.Tensor): 
+            The input tensor.
+
+        Returns:
+        --------
+        tuple[torch.Tensor, torch.Tensor]: 
+            The encoded tensor and the hidden state.
+        """
+        # convert to long tensor for nn.Embedding and embed the input
+        x = x.long() 
+        x = self.embedding(x)
+
+        # pass through the encoder
+        x, h = self.encoder(x)
+        return x, h
+    
+
+    def decode(self, x : torch.Tensor, h : torch.Tensor) -> torch.Tensor:
+        """
+        Decodes the input tensor.
+
+        Parameters:
+        -----------
+        x (torch.Tensor): 
+            The input tensor.
+        h (torch.Tensor): 
+            The hidden state.
+
+        Returns:
+        --------
+        torch.Tensor: 
+            The decoded tensor.
+        """
+        # pass through the decoder
+        x, _ = self.decoder(x, h)
+
+        # pass through the final linear layer
+        x = self.linear(x)
+
+        # squeeze the final dimension if applicable
+        return x.squeeze(-1)
 
 
     def _construct_rnn(
@@ -130,6 +188,11 @@ class RNN(nn.Module):
             )
 
 
+
+class RNN(BaseRNN):
+    """
+    A vanilla bidirectional RNN, as described in the BaseRNN class.
+    """
     def forward(self, x : torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the model.
@@ -144,16 +207,58 @@ class RNN(nn.Module):
         torch.Tensor: 
             The output tensor.
         """
-        # convert to long tensor for nn.Embedding and embed the input
-        x = x.long() 
-        x = self.embedding(x)
+        # encode the input
+        x, h = self.encode(x)
 
-        # pass through the encoder and decoder
-        x, h = self.encoder(x)
-        x, _ = self.decoder(x, h)
+        # decode the input
+        return self.decode(x, h)
+    
 
-        # pass through the final linear layer
-        x = self.linear(x)
 
-        # squeeze the final dimension if applicable
-        return x.squeeze(-1) 
+class RNNWithAttention(BaseRNN):
+    """
+    A bidirectional RNN with an attention layer.
+
+    Parameters:
+    -----------
+    num_heads (int):
+        The number of attention heads.
+    attention_dropout (float):
+        The dropout probability for the attention layer. Defaults to 0.0.
+    """
+    def __init__(
+            self,
+            num_heads : int, 
+            attention_dropout : float = 0.0,
+            *args, **kwargs,
+            ):
+        super().__init__(*args, **kwargs)
+        self.attention = MultiHeadSelfAttention(
+            embed_dim = self.hidden_size * 2,
+            num_heads = num_heads,
+            dropout = attention_dropout,
+            )
+    
+
+    def forward(self, x : torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the model.
+
+        Parameters:
+        -----------
+        x (torch.Tensor): 
+            The input tensor.
+
+        Returns:
+        --------
+        torch.Tensor: 
+            The output tensor.
+        """
+        # encode the input
+        x, h = self.encode(x)
+
+        # pass through the attention layer
+        x = self.attention(x)
+
+        # decode the input
+        return self.decode(x, h)
