@@ -215,6 +215,7 @@ class MultiHeadSelfAttention(nn.Module):
             num_heads : int, 
             dropout : float = 0.0,
             ) -> None:
+        super().__init__()
         self.attention = nn.MultiheadAttention(embed_dim, num_heads, dropout)
     
     def forward(self, x : torch.Tensor) -> torch.Tensor:
