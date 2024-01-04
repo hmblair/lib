@@ -337,7 +337,11 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
 
         # loop through the losses, ensuring that they are valid and logging them
         for name, value in losses.items():
-            self._log(phase + '_' + name, value) 
+            self._log(
+                phase + '_' + name, 
+                value, 
+                on_step = (phase == 'train'),
+                )
         return losses['loss']
 
 
