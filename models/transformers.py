@@ -107,7 +107,12 @@ class BaseTransformerWithSinusoidalPosEnc(BaseTransformer):
         """
         batch_size, seq_len, embedding_dim = x.shape # get the shape of the input
 
-        encoding = torch.zeros(seq_len, embedding_dim, device=x.device, requires_grad=False) # initialise the encoding
+        encoding = torch.zeros(
+            seq_len, 
+            embedding_dim, 
+            device=x.device, 
+            requires_grad=False,
+            ) # initialise the encoding
         pos = torch.arange(seq_len) # get the positions
 
         for i in range(embedding_dim // 2):
@@ -201,6 +206,19 @@ class Transformer(BaseTransformer):
         # pass through the final layers
         x = self.linear(x).squeeze(-1) 
         return torch.mean(x, dim=-1, keepdim=True)
+    
+
+class MultiHeadSelfAttention(nn.Module):
+    def __init__(
+            self, 
+            embed_dim : int, 
+            num_heads : int, 
+            dropout : float = 0.0,
+            ) -> None:
+        self.attention = nn.MultiheadAttention(embed_dim, num_heads, dropout)
+    
+    def forward(self, x : torch.Tensor) -> torch.Tensor:
+        return self.attention(x, x, x)[0]
 
 
 import torch.nn.functional as F
