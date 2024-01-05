@@ -209,6 +209,18 @@ class Transformer(BaseTransformer):
     
 
 class MultiHeadSelfAttention(nn.Module):
+    """
+    Implements a multi-head self-attention layer.
+
+    Parameters:
+    -----------
+    embed_dim (int): 
+        The embedding dimension.
+    num_heads (int):
+        The number of attention heads.
+    dropout (float):
+        The dropout probability. Defaults to 0.0.
+    """
     def __init__(
             self, 
             embed_dim : int, 
@@ -219,6 +231,19 @@ class MultiHeadSelfAttention(nn.Module):
         self.attention = nn.MultiheadAttention(embed_dim, num_heads, dropout)
     
     def forward(self, x : torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the multi-head self-attention layer.
+
+        Parameters:
+        -----------
+        x (torch.Tensor): 
+            Input tensor of shape (batch_size, seq_len, embed_dim).
+
+        Returns:
+        --------
+        torch.Tensor: 
+            Output tensor of shape (batch_size, seq_len, embed_dim).
+        """
         return self.attention(x, x, x)[0]
 
 
