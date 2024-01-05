@@ -314,6 +314,11 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         return self.trainer.datamodule.compute_losses(x, y)
     
 
+    def on_fit_start(self) -> None:
+        self.objectives = self.trainer.datamodule.objectives
+        breakpoint()
+    
+
     def _compute_and_log_losses(
             self, 
             batch : tuple[torch.Tensor, torch.Tensor], 
