@@ -175,26 +175,6 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
             rank_zero_warn(
                 'No trainer was found. The compute_losses method will not be available.'
             )
-
-
-    def forward(self, *args, **kwargs) -> Any:
-        """
-        Forward pass of the model. This method should be implemented in the 
-        subclass.
-
-        Parameters:
-        ----------
-        *args: 
-            Variable length argument list.
-        **kwargs: 
-            Arbitrary keyword arguments.
-
-        Returns:
-        --------
-        Any: 
-            The output of the model.
-        """
-        return super().forward(*args, **kwargs)
     
 
     def _weight_init(self) -> None:
