@@ -104,7 +104,7 @@ class BaseFineTuningModel(BaseModel, metaclass=ABCMeta):
          # load the pre-trained model
         self.pt_model = self.load_model() 
          # freeze the model to begin with
-        self.freeze()
+        self.freeze_pt()
 
         # store the epoch to unfreeze the pre-trained model and the rank of LoRA
         self.unfreeze_epoch = unfreeze_epoch  
@@ -154,10 +154,10 @@ class BaseFineTuningModel(BaseModel, metaclass=ABCMeta):
         """
         if self.unfreeze_epoch is not None and self.current_epoch == self.unfreeze_epoch:
             rank_zero_info('We have reached the unfreeze epoch.')
-            self.unfreeze() 
+            self.unfreeze_pt() 
 
     
-    def freeze(self) -> None:
+    def freeze_pt(self) -> None:
         """
         Freezes the pre-trained model.
         """
@@ -168,7 +168,7 @@ class BaseFineTuningModel(BaseModel, metaclass=ABCMeta):
         rank_zero_info('Freezing the pre-trained model...')
         
 
-    def unfreeze(self) -> None:
+    def unfreeze_pt(self) -> None:
         """
         Unfreezes the pre-trained model, or the LoRA weights if using LoRA.
         """
