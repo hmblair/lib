@@ -226,10 +226,10 @@ class BedrockModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         tuple[int, int]: 
             The rank and world size of the current process.
         """
-        if self.trainer is not None:
+        try:
             rank = self.trainer.global_rank
             world_size = self.trainer.world_size
-        else:
+        except RuntimeError:
             warnings.warn(
                 message = 'No trainer object found. Setting rank to 0 and world' \
                     ' size to 1. To use distributed training, please pass this' \
