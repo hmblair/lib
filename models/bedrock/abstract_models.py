@@ -11,7 +11,7 @@ from .weight_init import xavier_init
 # ignore the following warnings
 import warnings
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
-warnings.filterwarnings("ignore", "Your `IterableDataset` has `__len__` defined*")
+warnings.filterwarnings("ignore", "*has `__len__` defined*")
 
 
 def module_requires_grad(module: torch.nn.Module) -> bool:
@@ -88,7 +88,7 @@ def log_mem_usage(f : Callable) -> Callable:
 
 
 
-def catch_and_log_errors(f):
+def catch_and_log_errors(f : Callable) -> Callable:
     """
     A decorator to catch any errors that occur in the given function and log
     them. If the model has a log method, the error is logged using that method.
@@ -167,6 +167,14 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
 
         # save the hyperparameters
         self.save_hyperparameters()  
+
+        # get the compute_losses method from the datamodule
+        if self.trainer is not None:
+            self.compute_losses = self.trainer.datamodule.compute_losses
+        else:
+            rank_zero_warn(
+                'No trainer was found. The compute_losses method will not be available.'
+            )
 
 
     def forward(self, *args, **kwargs) -> Any:
@@ -285,7 +293,7 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
     @catch_and_log_errors
     def predict_step(
             self, 
-            batch : Any, 
+            batch : tuple[torch.Tensor, None], 
             batch_ix : list[int]
             ) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -304,15 +312,15 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
             The inputs and predicted outputs from the model for the input batch.
         """ 
         # get the input from the batch
-        x, y = self._get_inputs_and_outputs(batch) 
+        x, _ = batch
 
         # return the input and the predicted output
-        return x, self(x), y
+        return x, self(x)
     
 
     def _compute_and_log_losses(
             self, 
-            batch : torch.Tensor, 
+            batch : tuple[torch.Tensor, torch.Tensor], 
             phase : str
             ) -> torch.Tensor:
         """
@@ -332,8 +340,11 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         torch.Tensor: 
             The primary loss value for the current step.
         """
+        # get the input and target from the batch
+        x, y = batch
+
         # compute the losses
-        losses = self._compute_losses(batch) 
+        losses = self.compute_losses(x, y) 
 
         # loop through the losses, ensuring that they are valid and logging them
         for name, value in losses.items():
@@ -344,25 +355,6 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
                 )
         return losses['loss']
 
-
-    def _compute_losses(self, batch : Any) -> dict[str, torch.Tensor]:
-        """
-        Compute the losses for the model. The loss named 'loss' will be the one 
-        which is used to train the model.
-
-        Parameters:
-        ----------
-        batch (Any): 
-            The input batch of data.
-
-        Returns:
-        --------
-        dict[str, torch.Tensor]: 
-            A dictionary containing the computed losses and their respective 
-            names.
-        """
-        raise NotImplementedError('The _compute_losses method must be implemented.')
-    
 
     def _log(
         self, 
@@ -394,60 +386,6 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
             on_step=on_step, 
             **kwargs
             )
-        
-
-    def _get_inputs_and_outputs(self, batch : Any) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Get the inputs and corresponding outputs from the given batch.
-
-        Parameters:
-        ----------
-        batch (Any): 
-            The input batch.
-
-        Returns:
-        --------
-        tuple(torch.Tensor, torch.Tensor): 
-            The inputs and corresponding outputs.
-        
-        Examples:
-            >>> x, y = self._get_inputs_and_outputs(batch)
-        """
-        raise NotImplementedError('The _get_inputs_and_outputs method must be implemented.')
-    
-
-    def _get_inputs(self, batch : Any) -> torch.Tensor:
-        """
-        Get the inputs from the given batch.
-
-        Parameters:
-        ----------
-        batch (Any): 
-            The input batch.
-
-        Returns:
-        --------
-        torch.Tensor: 
-            The inputs.
-        """
-        raise NotImplementedError('The _get_inputs method must be implemented.')
-    
-
-    def _get_outputs(self, batch : Any) -> torch.Tensor:
-        """
-        Get the outputs from the given batch.
-
-        Parameters:
-        ----------
-        batch (Any): 
-            The input batch.
-
-        Returns:
-        --------
-        torch.Tensor: 
-            The outputs.
-        """
-        raise NotImplementedError('The _get_outputs method must be implemented.')
 
 
     def _check_constant(self, x : torch.Tensor, eps : float = 1E-8) -> bool:
