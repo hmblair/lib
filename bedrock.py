@@ -128,7 +128,7 @@ def catch_and_log_errors(f : Callable) -> Callable:
 
 
 
-from model_utils.weight_init import WeightInitialisationMetaClass
+from .model_utils.weight_init import WeightInitialisationMetaClass
 from abc import abstractmethod
 class BedrockModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
     """
