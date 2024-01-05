@@ -334,7 +334,8 @@ class BedrockModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
                 'train', rank, world_size,
                 )
             self.data['validate'] = self._create_datasets(
-                'validate', rank, world_size),
+                'validate', rank, world_size,
+                )
         
         elif stage in ['test', 'validate', 'predict']:
             self.data[stage] = self._create_datasets(
