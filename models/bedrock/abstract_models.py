@@ -343,8 +343,11 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         # get the input and target from the batch
         x, y = batch
 
+        # get the model output
+        y_hat = self(x) 
+
         # compute the losses
-        losses = self.compute_losses(x, y) 
+        losses = self.compute_losses(y_hat, y) 
 
         # loop through the losses, ensuring that they are valid and logging them
         for name, value in losses.items():
