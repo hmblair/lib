@@ -3,12 +3,11 @@
 import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
-from typing import Union, Optional
+from typing import Union, Optional, Any
 from collections.abc import Iterable, Sequence, Mapping
 from abc import ABCMeta, abstractmethod
 import warnings
 import os
-
 
 class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
     """
@@ -59,6 +58,16 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         Calls the _create_dataloaders method for the 'test' phase.
     pred_dataloader: 
         Calls the _create_dataloaders method for the 'predict' phase.
+    get_inputs:
+        Extracts the inputs from the batch. Must be implemented by the subclass.
+    get_targets:
+        Extracts the targets from the batch. Must be implemented by the subclass.
+    on_before_batch_transfer:
+        Called before a batch is transferred to the device. This method extracts
+        the inputs and, if the phase not 'predict', the targets from the batch.
+    compute_losses:
+        Computes the losses given inputs and outputs. Must be implemented by the
+        subclass.
     """
     def __init__(
             self, 
@@ -266,3 +275,97 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
             The prediction dataloader.
         """
         return self._create_dataloaders('predict')
+    
+
+    @abstractmethod
+    def get_inputs(self, batch : Any) -> torch.Tensor:
+        """
+        Extracts the inputs from the batch. This is useful as the batch may be
+        of varying types, such as a tuple or a dictionary, and so this method
+        allows you to provide an interface for the model to retrieve the inputs.
+
+        Parameters:
+        ----------
+        batch (Any): 
+            The batch to extract the inputs from.
+
+        Returns:
+        -------
+        torch.Tensor: 
+            The inputs.
+        """
+        return
+    
+
+    @abstractmethod
+    def get_targets(self, batch : Any) -> torch.Tensor:
+        """
+        Extracts the targets from the batch. This is useful as the batch may be
+        of varying types, such as a tuple or a dictionary, and so this method
+        allows you to provide an interface for the model to retrieve the targets.
+
+        Parameters:
+        ----------
+        batch (Any): 
+            The batch to extract the targets from.
+
+        Returns:
+        -------
+        torch.Tensor: 
+            The targets.
+        """
+        return
+    
+
+    def on_before_batch_transfer(
+            self, 
+            batch: Any, 
+            dataloader_idx: int,
+            ) -> tuple[Any, Any]:
+        """
+        Called before a batch is transferred to the device. This method extracts
+        the inputs and, if the phase not 'predict', the targets from the batch.
+        In the latter case, the targets are returned as None.
+
+        Parameters:
+        ----------
+        batch (Any): 
+            The batch to extract the inputs and targets from.
+        dataloader_idx (int):
+            The index of the dataloader.
+
+        Returns:
+        -------
+        tuple[Any, Any]:
+            The inputs and, if the phase is not 'predict', targets, else None.
+        """
+        if self.trainer.predicting:
+            return self.get_inputs(batch), None
+        else:
+            return self.get_inputs(batch), self.get_targets(batch)
+        
+
+    @abstractmethod
+    def compute_losses(
+            self, 
+            model_outputs: torch.Tensor, 
+            targets: torch.Tensor, 
+            ) -> dict[str, torch.Tensor]:
+        """
+        Compute the losses given inputs and outputs. The loss named 'loss' will 
+        be the one which is used to train the model.
+
+        Parameters:
+        ----------
+        model_outputs (torch.Tensor): 
+            The outputs of the model.
+        targets (torch.Tensor):
+            The targets.
+
+        Returns:
+        -------
+        dict[str, torch.Tensor]: 
+            A dictionary containing the computed losses and their respective 
+            names.
+        """
+        return
