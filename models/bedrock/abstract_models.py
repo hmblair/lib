@@ -9,9 +9,9 @@ from .hook import HookList, patch_and_register_layer_hooks
 from .weight_init import xavier_init
 
 # ignore the following warnings
-import warnings
-warnings.filterwarnings("ignore", ".*does not have many workers.*")
-warnings.filterwarnings("ignore", "*has `__len__` defined*")
+# import warnings
+# warnings.filterwarnings("ignore", ".*does not have many workers.*")
+# warnings.filterwarnings("ignore", "*has `__len__` defined*")
 
 
 def module_requires_grad(module: torch.nn.Module) -> bool:
@@ -167,14 +167,6 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
 
         # save the hyperparameters
         self.save_hyperparameters()  
-
-        # get the compute_losses method from the datamodule
-        if self.trainer is not None:
-            self.compute_losses = self.trainer.datamodule.compute_losses
-        else:
-            rank_zero_warn(
-                'No trainer was found. The compute_losses method will not be available.'
-            )
     
 
     def _weight_init(self) -> None:
@@ -296,6 +288,29 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
 
         # return the input and the predicted output
         return x, self(x)
+    
+
+    def compute_losses(
+            self, 
+            x : torch.Tensor, 
+            y : torch.Tensor,
+            ) -> dict[str, torch.Tensor]:
+        """
+        Inherit the compute_losses() method from the datamodule.
+
+        Parameters:
+        ----------
+        x (torch.Tensor): 
+            The input tensor.
+        y (torch.Tensor):
+            The target tensor.
+
+        Returns:
+        --------
+        dict[str, torch.Tensor]: 
+            A dictionary containing the computed losses and their names.
+        """
+        return self.trainer.datamodule.compute_losses(x, y)
     
 
     def _compute_and_log_losses(
