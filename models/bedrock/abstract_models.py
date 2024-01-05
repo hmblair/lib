@@ -296,7 +296,8 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
             y : torch.Tensor,
             ) -> dict[str, torch.Tensor]:
         """
-        Inherit the compute_losses() method from the datamodule.
+        Inherit the compute_losses() method from the datamodule. If there is no
+        trainer attached to the model, then this method will raise an error.
 
         Parameters:
         ----------
