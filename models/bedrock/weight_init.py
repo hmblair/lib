@@ -3,6 +3,36 @@
 import torch.nn as nn
 from typing import Union
 from pytorch_lightning.utilities import rank_zero_warn
+from abc import ABCMeta, abstractmethod
+
+class WeightInitialisationMetaClass(ABCMeta):
+    """
+    A metaclass that automatically calls the _weight_init() method of a class
+    after all child classes are initialized. This is useful for initializing
+    the weights of a model after it is initialized.
+
+    Any class that inherits from this metaclass must implement the _weight_init()
+    method, and have a save_attention_weights attribute.
+
+    Inherits:
+    --------
+    ABCMeta: 
+        A metaclass that allows abstract methods to be defined.
+    """
+    def __call__(cls, *args, **kwargs):
+        # create an instance of the class using the __call__ method of the type 
+        # class
+        obj = type.__call__(cls, *args, **kwargs)
+        # initialize the weights
+        try:
+            obj._weight_init()
+        except Exception as e:
+            raise RuntimeError(
+                'The weights could not be initialized, since the _weight_init method is not implemented.'
+                ) from e
+
+        return obj
+    
 
 def xavier_init(
         m : nn.Module, 
