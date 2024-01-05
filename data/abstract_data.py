@@ -79,27 +79,6 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
             num_workers = os.cpu_count()
         self.num_workers = num_workers
 
-        # self.rank = torch.distributed.get_rank() if torch.distributed.is_available() else 0
-        # self.world_size = torch.distributed.get_world_size() if torch.distributed.is_available() else 1
-
-        # # get the rank and world size from the trainer object, if it exists,
-        # # otherwise set them to 0 and 1 respectively
-        # if self.trainer is not None:
-        #     self.rank = self.trainer.global_rank
-        #     self.world_size = self.trainer.world_size
-        # else:
-        #     warnings.warn(
-        #         message = 'No trainer object found. Setting rank to 0 and world' \
-        #             ' size to 1. To use distributed training, please pass this' \
-        #             ' DataModule to a trainer object.', 
-        #         category = UserWarning, 
-        #         stacklevel = 2
-        #         )
-        #     self.rank = 0
-        #     self.world_size = 1
-
-        # print('Rank:', self.rank, 'World size:', self.world_size)
-
 
     def distributed_info(self) -> tuple[int, int]:
         """
@@ -181,10 +160,14 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
             The dataloader for the specified phase.
         """
         if phase not in ['train', 'validate', 'test', 'predict']:
-            raise ValueError(f'Unknown phase {phase}. Please specify one of "train", "validate", "test", or "predict".')
+            raise ValueError(
+                f'Unknown phase {phase}. Please specify one of "train", "validate", "test", or "predict".'
+                )
         
         if phase not in self.data:
-            raise ValueError(f'There is no {phase} dataset. Please call the setup method with the appropriate stage first.')
+            raise ValueError(
+                f'There is no {phase} dataset. Please call the setup method with the appropriate stage first.'
+                )
 
         return DataLoader(
             dataset = self.data[phase],
@@ -206,7 +189,8 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
 
     def setup(self, stage: str) -> None:
         """
-        Creates datasets for the specified stage, and stores them in the 'self.data' dictionary.
+        Creates datasets for the specified stage, and stores them in the 
+        'self.data' dictionary.
 
         Parameters:
         ----------
@@ -227,7 +211,9 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         elif stage in ['test', 'validate', 'predict']:
             self.data[stage] = self._create_datasets(stage, rank, world_size)
         else:
-            raise ValueError(f'Invalid stage {stage}. The stage must be either "fit", "validate", "test" or "predict".')
+            raise ValueError(
+                f'Invalid stage {stage}. The stage must be either "fit", "validate", "test" or "predict".'
+                )
 
 
     def train_dataloader(self) -> DataLoader:
@@ -244,14 +230,18 @@ class BaseDataModule(pl.LightningDataModule, metaclass=ABCMeta):
 
     def val_dataloader(self) -> DataLoader:
         """
-        Returns the validaiton dataloader.
+        Returns the validaiton dataloader, if a validation dataset exists. Else,
+        raises a NotImplementedError.
 
         Returns:
         -------
         torch.utils.data.DataLoader: 
             The validation dataloader.
         """
-        return self._create_dataloaders('validate')
+        if self.data['validate'] is not None:
+            return self._create_dataloaders('validate')
+        else:
+            return super().val_dataloader()
 
 
     def test_dataloader(self) -> DataLoader:
