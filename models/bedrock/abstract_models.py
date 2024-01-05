@@ -168,6 +168,9 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
         # save the hyperparameters
         self.save_hyperparameters()  
     
+    def setup(self, stage: str) -> None:
+        self.objectives = self.trainer.datamodule.objectives
+        breakpoint()
 
     def _weight_init(self) -> None:
         """
@@ -312,11 +315,6 @@ class BaseModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
             A dictionary containing the computed losses and their names.
         """
         return self.trainer.datamodule.compute_losses(x, y)
-    
-
-    def on_fit_start(self) -> None:
-        self.objectives = self.trainer.datamodule.objectives
-        breakpoint()
     
 
     def _compute_and_log_losses(
