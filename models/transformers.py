@@ -56,7 +56,7 @@ class SinusoidalPositionalEncoding(nn.Module):
         # add the encoding to the input
         return x + encoding.repeat(batch_size, 1, 1) 
     
-
+    
 
 class BareTransformer(nn.Module):
     """
@@ -105,7 +105,7 @@ class BareTransformer(nn.Module):
             dim_feedforward : int,
             dropout : float = 0.0,
             norm_first : bool = False,
-            *args, **kwargs,
+            *args, **kwargs
             ):
         super().__init__(*args, **kwargs)
 
@@ -222,14 +222,38 @@ class TransformerWithSinusoidalPositionalEncoding(BareTransformer):
     """
     def __init__(
             self,
+            num_embeddings : int,
+            embed_dim : int,
             k : int = 10000,
             *args, **kwargs
             ):
-        super().__init__(*args, **kwargs)
+        super().__init__(embed_dim=embed_dim, *args, **kwargs)
 
+        # embedding layer
+        self.embedding = nn.Embedding(num_embeddings, kwargs['embed_dim'])
 
         # positional encoding layer
         self.positional_encoding = SinusoidalPositionalEncoding(k)
+
+
+    def embed(self, x : torch.Tensor) -> torch.Tensor:
+        """
+        Passes a tensor through the embedding layer.
+
+        Parameters:
+        -----------
+        x (torch.Tensor): 
+            Input tensor of shape (batch_size, seq_len).
+
+        Returns:
+        --------
+        torch.Tensor: 
+            Embedded tensor of shape (batch_size, seq_len, embed_dim).
+        """
+        return self.embedding(
+            x.long()
+        )
+
 
     def forward(self, x : torch.Tensor) -> torch.Tensor:
         """
