@@ -58,16 +58,14 @@ class SinusoidalPositionalEncoding(nn.Module):
     
 
 
-class TransformerWithoutPositionalEncoding(nn.Module):
+class BareTransformer(nn.Module):
     """
-    A transformer model without positional encoding.
+    A transformer model without positional encoding or an embedding layer.
 
     Parameters:
     -----------
     embed_dim (int): 
         The embedding dimension.
-    num_embeddings (int): 
-        The maximum integer that can be embedded.
     output_dim (int):
         The size of the output dimension.
     num_layers (int):
@@ -101,19 +99,15 @@ class TransformerWithoutPositionalEncoding(nn.Module):
     def __init__(
             self, 
             embed_dim : int,
-            num_embeddings : int,
             output_dim : int, 
             num_layers : int,
             num_heads : int,
             dim_feedforward : int,
             dropout : float = 0.0,
             norm_first : bool = False,
-            *args, **kwargs
+            *args, **kwargs,
             ):
         super().__init__(*args, **kwargs)
-
-        # embedding layer
-        self.embedding = nn.Embedding(num_embeddings, embed_dim)
 
         # transformer encoder
         self.tfe = self.build_transformer(
@@ -156,6 +150,8 @@ class TransformerWithoutPositionalEncoding(nn.Module):
             feedforward layers. Defaults to False. True will yield a Pre-LN
             Transformer, as described in 'On Layer Normalization in the 
             Transformer Architecture', found at https://arxiv.org/abs/2002.04745.
+        dropout (float):
+            The dropout probability. Defaults to 0.0.
 
         Returns:
         --------
@@ -181,25 +177,6 @@ class TransformerWithoutPositionalEncoding(nn.Module):
         return nn.Sequential(*tfe_layers) 
     
 
-    def embed(self, x : torch.Tensor) -> torch.Tensor:
-        """
-        Passes a tensor through the embedding layer.
-
-        Parameters:
-        -----------
-        x (torch.Tensor): 
-            Input tensor of shape (batch_size, seq_len).
-
-        Returns:
-        --------
-        torch.Tensor: 
-            Embedded tensor of shape (batch_size, seq_len, embed_dim).
-        """
-        return self.embedding(
-            x.long()
-        )
-
-
     def forward(self, x : torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the model.
@@ -210,9 +187,6 @@ class TransformerWithoutPositionalEncoding(nn.Module):
         Returns:
             torch.Tensor: Output tensor of shape (batch_size, 1).
         """
-        # pass through the embedding layer
-        x = self.embed(x)
-
         # pass through the transformer encoder
         x = self.tfe(x) 
 
@@ -221,7 +195,7 @@ class TransformerWithoutPositionalEncoding(nn.Module):
 
 
 
-class TransformerWithSinusoidalPositionalEncoding(TransformerWithoutPositionalEncoding):
+class TransformerWithSinusoidalPositionalEncoding(BareTransformer):
     """
     A transformer model.
 
