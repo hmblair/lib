@@ -68,6 +68,21 @@ class TransformerWithoutPositionalEncoding(nn.Module):
         The embedding dimension.
     num_embeddings (int): 
         The maximum integer that can be embedded.
+    output_dim (int):
+        The size of the output dimension.
+    num_layers (int):
+        The number of layers in the transformer encoder.
+    num_heads (int):
+        The number of attention heads.
+    dim_feedforward (int):
+        The dimension of the feedforward layer in the transformer encoder.
+    dropout (float):
+        The dropout probability. Defaults to 0.0.
+    norm_first (bool):
+        Whether to apply layer normalization before the self-attention and
+        feedforward layers. Defaults to False. True will yield a Pre-LN
+        Transformer, as described in 'On Layer Normalization in the 
+        Transformer Architecture', found at https://arxiv.org/abs/2002.04745.
     *args: 
         Variable length argument list.
     **kwargs: 
@@ -86,11 +101,12 @@ class TransformerWithoutPositionalEncoding(nn.Module):
     def __init__(
             self, 
             embed_dim : int,
-            output_dim : int,
             num_embeddings : int,
+            output_dim : int, 
+            num_layers : int,
             num_heads : int,
             dim_feedforward : int,
-            num_layers : int,
+            dropout : float = 0.0,
             norm_first : bool = False,
             *args, **kwargs
             ):
@@ -106,12 +122,64 @@ class TransformerWithoutPositionalEncoding(nn.Module):
             dim_feedforward=dim_feedforward,
             num_layers=num_layers,
             norm_first=norm_first,
+            dropout=dropout,
         )
 
         # final linear layer
         self.linear = nn.Linear(embed_dim, output_dim)
-       
+
     
+    @staticmethod
+    def build_transformer(
+            embed_dim : int,
+            num_heads : int,
+            dim_feedforward : int,
+            num_layers : int,
+            norm_first : bool,
+            dropout : float,
+            ) -> nn.Sequential:
+        """
+        Builds a transformer encoder from the given parameters.
+
+        Parameters:
+        -----------
+        embed_dim (int):
+            The embedding dimension.
+        num_heads (int):
+            The number of attention heads.
+        dim_feedforward (int):
+            The dimension of the feedforward layer in the transformer encoder.
+        num_layers (int):
+            The number of layers in the transformer encoder.
+        norm_first (bool):
+            Whether to apply layer normalization before the self-attention and
+            feedforward layers. Defaults to False. True will yield a Pre-LN
+            Transformer, as described in 'On Layer Normalization in the 
+            Transformer Architecture', found at https://arxiv.org/abs/2002.04745.
+
+        Returns:
+        --------
+        nn.Sequential:
+            The transformer encoder.
+        """
+        # initialise the list to store the layers
+        tfe_layers = []
+        # construct the transformer encoder layers
+        for _ in range(num_layers):
+            tfe_layers.append(
+                nn.TransformerEncoderLayer(
+                    d_model=embed_dim,
+                    nhead=num_heads,
+                    dim_feedforward=dim_feedforward,
+                    norm_first=norm_first,
+                    dropout=dropout,
+                    )
+                )
+
+        # join the transformer encoder layers into a sequential model
+        return nn.Sequential(*tfe_layers) 
+    
+
     def embed(self, x : torch.Tensor) -> torch.Tensor:
         """
         Passes a tensor through the embedding layer.
@@ -130,55 +198,6 @@ class TransformerWithoutPositionalEncoding(nn.Module):
             x.long()
         )
 
-    
-    @staticmethod
-    def build_transformer(
-            embed_dim : int,
-            num_heads : int,
-            dim_feedforward : int,
-            num_layers : int,
-            norm_first : bool,
-    ) -> nn.Sequential:
-        """
-        Builds a transformer encoder from the given parameters.
-
-        Parameters:
-        -----------
-        embed_dim (int):
-            The embedding dimension.
-        num_heads (int):
-            The number of attention heads.
-        dim_feedforward (int):
-            The dimension of the feedforward layer in the transformer encoder.
-        num_layers (int):
-            The number of layers in the transformer encoder.
-        norm_first (bool):
-            Whether to apply layer normalization before the self-attention and
-            feedforward layers. Defaults to False. True will yield a Pre-LN
-            Transformer, as described in 'On Layer Normalization in the Transformer
-            Architecture', found at https://arxiv.org/abs/2002.04745.
-
-        Returns:
-        --------
-        nn.Sequential:
-            The transformer encoder.
-        """
-        # initialise the list to store the layers
-        tfe_layers = []
-        # construct the transformer encoder layers
-        for _ in range(num_layers):
-            tfe_layers.append(
-                nn.TransformerEncoderLayer(
-                    d_model=embed_dim,
-                    nhead=num_heads,
-                    dim_feedforward=dim_feedforward,
-                    norm_first=norm_first,
-                    )
-                )
-
-        # join the transformer encoder layers into a sequential model
-        return nn.Sequential(*tfe_layers) 
-    
 
     def forward(self, x : torch.Tensor) -> torch.Tensor:
         """
@@ -242,10 +261,10 @@ class TransformerWithSinusoidalPositionalEncoding(TransformerWithoutPositionalEn
         Forward pass of the model.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, seq_len).
+            x (torch.Tensor): Input integer tensor of shape (batch_size, seq_len).
 
         Returns:
-            torch.Tensor: Output tensor of shape (batch_size, 1).
+            torch.Tensor: Output tensor of shape (batch_size, seq_len, output_dim).
         """
         # pass through the embedding layer and add on the positional encoding
         x = self.embed(x)
