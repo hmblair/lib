@@ -3,9 +3,9 @@
 import torch
 from torch.utils.data import Dataset
 from typing import Any, Iterable, Sequence, Union
+from torch.utils.data import IterableDataset
 
-
-class DistributedIterableDataset:
+class DistributedIterableDataset(IterableDataset):
     def __init__(self, rank : int = 0, world_size : int = 1) -> None:
         self.rank = rank
         self.world_size = world_size
