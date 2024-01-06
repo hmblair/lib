@@ -104,11 +104,13 @@ class VariableLengthIterableDataset(DistributedIterableDataset):
             self, 
             data : list[torch.Tensor],
             batch_size : int,
+            shuffle : bool = True,
             *args, **kwargs,
             ) -> None:
         super().__init__(*args, **kwargs)
         self.data = [self.split(tensor) for tensor in data]
         self.batch_size = batch_size
+        self.shuffle = shuffle
 
 
     def get_ix(self) -> Iterable[list[int]]:
@@ -118,7 +120,8 @@ class VariableLengthIterableDataset(DistributedIterableDataset):
             ]
         while indices:
             for ix in indices:
-                random.shuffle(ix)
+                if self.shuffle:
+                    random.shuffle(ix)
                 yield group(ix, self.batch_size)
     
 
