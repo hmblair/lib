@@ -2,11 +2,65 @@ from typing import Optional, Tuple, Union, Callable, Any
 import torch
 import torch.nn as nn
 
-
-class BaseTransformer(nn.Module):
+class SinusoidalPositionalEncoding(nn.Module):
     """
-    Base for building transformer models upon. Implements the embedding layer and the learning rate scheduler,
-    as well as some boilerplate methods.
+    Implements a sinusoidal positional encoding layer.
+
+    Parameters:
+    -----------
+    k (int):
+        The frequency for the sinusoidal positional encoding. Defaults to 10000,
+        which is the default value in the paper 'Attention Is All You Need'.
+    """
+    def __init__(self, k : int) -> None:
+        super().__init__()
+        self.k = k
+    
+
+    def forward(self, x : torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the positional encoding layer.
+
+        Parameters:
+        -----------
+        x (torch.Tensor): 
+            Input tensor of shape (batch_size, seq_len, embedding_dim).
+
+        Returns:
+        --------
+        torch.Tensor: 
+            Output tensor of shape (batch_size, seq_len, embedding_dim) after 
+            adding positional encoding.
+        """
+        # get the shape of the input
+        batch_size, seq_len, embedding_dim = x.shape 
+
+        # initialise the encoding
+        encoding = torch.zeros(
+            seq_len, 
+            embedding_dim, 
+            device=x.device, 
+            requires_grad=False,
+            ) 
+        
+        # get the positions
+        pos = torch.arange(seq_len) 
+
+        # compute the encoding 
+        for i in range(embedding_dim // 2):
+            encoding[:, 2*i] = torch.sin(pos / self.k ** (2 * i / embedding_dim)) 
+            encoding[:, 2*i + 1] = torch.cos(pos / self.k ** (2 * i / embedding_dim)) 
+        if embedding_dim % 2 == 1:
+            encoding[:, -1] = torch.sin(pos / self.k) 
+
+        # add the encoding to the input
+        return x + encoding.repeat(batch_size, 1, 1) 
+    
+
+
+class TransformerWithoutPositionalEncoding(nn.Module):
+    """
+    A transformer model without positional encoding.
 
     Parameters:
     -----------
@@ -14,8 +68,6 @@ class BaseTransformer(nn.Module):
         The embedding dimension.
     num_embeddings (int): 
         The maximum integer that can be embedded.
-    lr_warmup_steps (int): 
-        The number of warmup steps for the learning rate. Defaults to 4000.
     *args: 
         Variable length argument list.
     **kwargs: 
@@ -23,10 +75,6 @@ class BaseTransformer(nn.Module):
 
     Attributes:
     ----------
-    embed_dim (int): 
-        The embedding dimension.
-    lr_warmup_steps (int): 
-        The number of warmup steps for the learning rate.
     embedding (nn.Embedding): 
         The embedding layer.
 
@@ -38,39 +86,35 @@ class BaseTransformer(nn.Module):
     def __init__(
             self, 
             embed_dim : int,
-            num_embeddings : int, 
+            output_dim : int,
+            num_embeddings : int,
+            num_heads : int,
+            dim_feedforward : int,
+            num_layers : int,
+            norm_first : bool = False,
             *args, **kwargs
             ):
         super().__init__(*args, **kwargs)
 
-        # store the embedding dimension
-        self.embed_dim = embed_dim
-
         # embedding layer
         self.embedding = nn.Embedding(num_embeddings, embed_dim)
 
+        # transformer encoder
+        self.tfe = self.build_transformer(
+            embed_dim=embed_dim,
+            num_heads=num_heads,
+            dim_feedforward=dim_feedforward,
+            num_layers=num_layers,
+            norm_first=norm_first,
+        )
 
-    def _absolute_positional_encoding(self, x : torch.Tensor) -> torch.Tensor:
+        # final linear layer
+        self.linear = nn.Linear(embed_dim, output_dim)
+       
+    
+    def embed(self, x : torch.Tensor) -> torch.Tensor:
         """
-        Forward pass of the positional encoding layer. Overwrite this method in 
-        order to implement different positional encodings. The default is to not
-        add any positional encoding.
-
-        Args:
-            x (torch.Tensor): Input tensor of shape 
-            (batch_size, seq_len, embedding_dim).
-
-        Returns:
-            torch.Tensor: Output tensor of shape 
-            (batch_size, seq_len, embedding_dim) after adding positional encoding.
-        """
-        return x
-
-
-    def _embed(self, x : torch.Tensor) -> torch.Tensor:
-        """
-        Passes a tensor through the embedding layer and adds on an absoute 
-        positional encoding.
+        Passes a tensor through the embedding layer.
 
         Parameters:
         -----------
@@ -82,71 +126,91 @@ class BaseTransformer(nn.Module):
         torch.Tensor: 
             Embedded tensor of shape (batch_size, seq_len, embed_dim).
         """
-        x = x.long()
-        x = self.embedding(x)
-        return self._absolute_positional_encoding(x)
+        return self.embedding(
+            x.long()
+        )
 
-
-
-
-
-class BaseTransformerWithSinusoidalPosEnc(BaseTransformer):
-    def __init__(self, k : int, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.k = k
-
-    def _absolute_positional_encoding(self, x: torch.Tensor) -> torch.Tensor:
+    
+    @staticmethod
+    def build_transformer(
+            embed_dim : int,
+            num_heads : int,
+            dim_feedforward : int,
+            num_layers : int,
+            norm_first : bool,
+    ) -> nn.Sequential:
         """
-        Forward pass of the positional encoding layer.
+        Builds a transformer encoder from the given parameters.
 
-        Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, seq_len, embedding_dim).
+        Parameters:
+        -----------
+        embed_dim (int):
+            The embedding dimension.
+        num_heads (int):
+            The number of attention heads.
+        dim_feedforward (int):
+            The dimension of the feedforward layer in the transformer encoder.
+        num_layers (int):
+            The number of layers in the transformer encoder.
+        norm_first (bool):
+            Whether to apply layer normalization before the self-attention and
+            feedforward layers. Defaults to False. True will yield a Pre-LN
+            Transformer, as described in 'On Layer Normalization in the Transformer
+            Architecture', found at https://arxiv.org/abs/2002.04745.
 
         Returns:
-            torch.Tensor: Output tensor of shape (batch_size, seq_len, embedding_dim) after adding positional encoding.
+        --------
+        nn.Sequential:
+            The transformer encoder.
         """
-        batch_size, seq_len, embedding_dim = x.shape # get the shape of the input
+        # initialise the list to store the layers
+        tfe_layers = []
+        # construct the transformer encoder layers
+        for _ in range(num_layers):
+            tfe_layers.append(
+                nn.TransformerEncoderLayer(
+                    d_model=embed_dim,
+                    nhead=num_heads,
+                    dim_feedforward=dim_feedforward,
+                    norm_first=norm_first,
+                    )
+                )
 
-        encoding = torch.zeros(
-            seq_len, 
-            embedding_dim, 
-            device=x.device, 
-            requires_grad=False,
-            ) # initialise the encoding
-        pos = torch.arange(seq_len) # get the positions
+        # join the transformer encoder layers into a sequential model
+        return nn.Sequential(*tfe_layers) 
+    
 
-        for i in range(embedding_dim // 2):
-            encoding[:, 2*i] = torch.sin(pos / self.k ** (2 * i / embedding_dim)) # compute the encoding 
-            encoding[:, 2*i + 1] = torch.cos(pos / self.k ** (2 * i / embedding_dim)) # compute the encoding
+    def forward(self, x : torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the model.
 
-        if embedding_dim % 2 == 1:
-            encoding[:, -1] = torch.sin(pos / self.k) # compute the encoding
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, seq_len).
 
-        return x + encoding.repeat(batch_size, 1, 1) # add the encoding to the input
+        Returns:
+            torch.Tensor: Output tensor of shape (batch_size, 1).
+        """
+        # pass through the embedding layer
+        x = self.embed(x)
+
+        # pass through the transformer encoder
+        x = self.tfe(x) 
+
+        # pass through the final layers, squeezing the output if necessary
+        return self.linear(x).squeeze(-1)
 
 
 
-
-
-class Transformer(BaseTransformer):
+class TransformerWithSinusoidalPositionalEncoding(nn.Module):
     """
-    Transformer model, as vanilla as it gets.
+    A transformer model.
 
     Parameters:
     -----------
-    output_dim (int):
-        The output dimension.
-    feedforward_dim (int): 
-        The dimension of the feedforward layer in the transformer encoder.
-    num_heads (int): 
-        The number of attention heads in the transformer encoder.
-    num_layers (int): 
-        The number of layers in the transformer encoder.
-    norm_first (bool): 
-        Whether to apply layer normalization before the self-attention and 
-        feedforward layers. Defaults to False. True will yield a Pre-LN 
-        Transformer, as described in 'On Layer Normalization in the Transformer 
-        Architecture', found at https://arxiv.org/abs/2002.04745.
+    embed_dim (int): 
+        The embedding dimension.
+    num_embeddings (int): 
+        The maximum integer that can be embedded.
     *args: 
         Variable length argument list.
     **kwargs: 
@@ -154,40 +218,26 @@ class Transformer(BaseTransformer):
 
     Attributes:
     ----------
-    tfe (nn.TransformerEncoder): 
-        The transformer encoder.
-    linear (nn.Linear): 
-        The final linear layer.
+    embedding (nn.Embedding): 
+        The embedding layer.
+
+    Inherits:
+    ----------
+    nn.Module: 
+        The base PyTorch module class.
     """
     def __init__(
             self,
-            output_dim: int,
-            feedforward_dim: int,
-            num_heads: int,
-            num_layers: int,
-            norm_first: bool = False,
-            *args, **kwargs,
+            k : int = 10000,
+            *args, **kwargs
             ):
         super().__init__(*args, **kwargs)
-        tfe_layers = []
-        for _ in range(num_layers):
-            tfe_layers.append(
-                nn.TransformerEncoderLayer(
-                    d_model=self.embed_dim,
-                    nhead=num_heads,
-                    dim_feedforward=feedforward_dim,
-                    norm_first=norm_first,
-                    )
-                    )
-
-        # transformer encoder
-        self.tfe = nn.Sequential(*tfe_layers) 
-
-        # final linear layer
-        self.linear = nn.Linear(self.embed_dim, output_dim)
 
 
-    def forward(self, x):
+        # positional encoding layer
+        self.positional_encoding = SinusoidalPositionalEncoding(k)
+
+    def forward(self, x : torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the model.
 
@@ -198,14 +248,135 @@ class Transformer(BaseTransformer):
             torch.Tensor: Output tensor of shape (batch_size, 1).
         """
         # pass through the embedding layer and add on the positional encoding
-        x = self._embed(x)
+        x = self.embed(x)
+        x = self.positional_encoding(x)
 
         # pass through the transformer encoder
         x = self.tfe(x) 
 
-        # pass through the final layers
-        x = self.linear(x).squeeze(-1) 
-        return torch.mean(x, dim=-1, keepdim=True)
+        # pass through the final layers, squeezing the output if necessary
+        return self.linear(x).squeeze(-1)
+
+
+
+
+
+# class BaseTransformerWithSinusoidalPosEnc(BaseTransformer):
+#     def __init__(self, k : int, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         self.k = k
+
+#     def _absolute_positional_encoding(self, x: torch.Tensor) -> torch.Tensor:
+#         """
+#         Forward pass of the positional encoding layer.
+
+#         Args:
+#             x (torch.Tensor): Input tensor of shape (batch_size, seq_len, embedding_dim).
+
+#         Returns:
+#             torch.Tensor: Output tensor of shape (batch_size, seq_len, embedding_dim) after adding positional encoding.
+#         """
+#         batch_size, seq_len, embedding_dim = x.shape # get the shape of the input
+
+#         encoding = torch.zeros(
+#             seq_len, 
+#             embedding_dim, 
+#             device=x.device, 
+#             requires_grad=False,
+#             ) # initialise the encoding
+#         pos = torch.arange(seq_len) # get the positions
+
+#         for i in range(embedding_dim // 2):
+#             encoding[:, 2*i] = torch.sin(pos / self.k ** (2 * i / embedding_dim)) # compute the encoding 
+#             encoding[:, 2*i + 1] = torch.cos(pos / self.k ** (2 * i / embedding_dim)) # compute the encoding
+
+#         if embedding_dim % 2 == 1:
+#             encoding[:, -1] = torch.sin(pos / self.k) # compute the encoding
+
+#         return x + encoding.repeat(batch_size, 1, 1) # add the encoding to the input
+
+
+
+
+
+# class Transformer(BaseTransformer):
+#     """
+#     Transformer model, as vanilla as it gets.
+
+#     Parameters:
+#     -----------
+#     output_dim (int):
+#         The output dimension.
+#     feedforward_dim (int): 
+#         The dimension of the feedforward layer in the transformer encoder.
+#     num_heads (int): 
+#         The number of attention heads in the transformer encoder.
+#     num_layers (int): 
+#         The number of layers in the transformer encoder.
+#     norm_first (bool): 
+#         Whether to apply layer normalization before the self-attention and 
+#         feedforward layers. Defaults to False. True will yield a Pre-LN 
+#         Transformer, as described in 'On Layer Normalization in the Transformer 
+#         Architecture', found at https://arxiv.org/abs/2002.04745.
+#     *args: 
+#         Variable length argument list.
+#     **kwargs: 
+#         Arbitrary keyword arguments.
+
+#     Attributes:
+#     ----------
+#     tfe (nn.TransformerEncoder): 
+#         The transformer encoder.
+#     linear (nn.Linear): 
+#         The final linear layer.
+#     """
+#     def __init__(
+#             self,
+#             output_dim: int,
+#             feedforward_dim: int,
+#             num_heads: int,
+#             num_layers: int,
+#             norm_first: bool = False,
+#             *args, **kwargs,
+#             ):
+#         super().__init__(*args, **kwargs)
+#         tfe_layers = []
+#         for _ in range(num_layers):
+#             tfe_layers.append(
+#                 nn.TransformerEncoderLayer(
+#                     d_model=self.embed_dim,
+#                     nhead=num_heads,
+#                     dim_feedforward=feedforward_dim,
+#                     norm_first=norm_first,
+#                     )
+#                     )
+
+#         # transformer encoder
+#         self.tfe = nn.Sequential(*tfe_layers) 
+
+#         # final linear layer
+#         self.linear = nn.Linear(self.embed_dim, output_dim)
+
+
+    # def forward(self, x):
+    #     """
+    #     Forward pass of the model.
+
+    #     Args:
+    #         x (torch.Tensor): Input tensor of shape (batch_size, seq_len).
+
+    #     Returns:
+    #         torch.Tensor: Output tensor of shape (batch_size, 1).
+    #     """
+    #     # pass through the embedding layer and add on the positional encoding
+    #     x = self._embed(x)
+
+    #     # pass through the transformer encoder
+    #     x = self.tfe(x) 
+
+    #     # pass through the final layers
+    #     x = self.linear(x).squeeze(-1) 
+    #     return torch.mean(x, dim=-1, keepdim=True)
     
 
 class MultiHeadSelfAttention(nn.Module):
@@ -339,7 +510,14 @@ if __name__ == '__main__':
     # a simple test
 
     # Create an instance of the Transformer model
-    model = Transformer(output_dim=1, feedforward_dim=256, num_heads=4, num_layers=2, embed_dim=128, num_embeddings = 4)
+    model = TransformerWithSinusoidalPositionalEncoding(
+        output_dim=1, 
+        dim_feedforward=256, 
+        num_heads=4, 
+        num_layers=2, 
+        embed_dim=128, 
+        num_embeddings = 4,
+        )
 
     # Generate some random input data
     batch_size = 32
