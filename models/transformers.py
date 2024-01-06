@@ -230,7 +230,7 @@ class TransformerWithSinusoidalPositionalEncoding(BareTransformer):
         super().__init__(embed_dim=embed_dim, *args, **kwargs)
 
         # embedding layer
-        self.embedding = nn.Embedding(num_embeddings, kwargs['embed_dim'])
+        self.embedding = nn.Embedding(num_embeddings, embed_dim)
 
         # positional encoding layer
         self.positional_encoding = SinusoidalPositionalEncoding(k)
