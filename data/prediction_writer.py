@@ -170,11 +170,14 @@ class DistributedPredictionWriterToH5(DistributedPredictionWriter):
         # table in the HDF5 file.
 
         x, y = prediction
+        if x.ndim == 1:
+            x = x[None, :]
+        if y.ndim == 1:
+            y = y[None, :]
         b, *x_shape = x.shape
         b, *y_shape = y.shape
 
         dt=[('input', x.dtype, x_shape), ('output', y.dtype, y_shape)]
-        breakpoint()
         data = np.zeros((b,), dtype=dt)
         data['input'] = x
         data['output'] = y
