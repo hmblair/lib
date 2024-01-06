@@ -137,7 +137,7 @@ class VariableLengthIterableDataset(DistributedIterableDataset):
             )
     
 
-from data.h5tools import HDF5File
+from .data.h5tools import HDF5File
 class VariableLengthIterableHDF5Dataset(VariableLengthIterableDataset):
     def __init__(
             self, 
