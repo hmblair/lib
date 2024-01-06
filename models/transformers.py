@@ -173,6 +173,7 @@ class TransformerWithoutPositionalEncoding(nn.Module):
                     dim_feedforward=dim_feedforward,
                     norm_first=norm_first,
                     dropout=dropout,
+                    batch_first=True,
                     )
                 )
 
