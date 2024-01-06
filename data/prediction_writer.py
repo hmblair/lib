@@ -171,9 +171,9 @@ class DistributedPredictionWriterToH5(DistributedPredictionWriter):
 
         x, y = prediction
         if x.ndim == 1:
-            x = x[None, :]
+            x = x[:, None]
         if y.ndim == 1:
-            y = y[None, :]
+            y = y[:, None]
         b, *x_shape = x.shape
         b, *y_shape = y.shape
 
