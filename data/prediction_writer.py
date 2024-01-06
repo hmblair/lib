@@ -174,6 +174,7 @@ class DistributedPredictionWriterToH5(DistributedPredictionWriter):
         b, *y_shape = y.shape
 
         dt=[('input', x.dtype, x_shape), ('output', y.dtype, y_shape)]
+        breakpoint()
         data = np.zeros((b,), dtype=dt)
         data['input'] = x
         data['output'] = y
