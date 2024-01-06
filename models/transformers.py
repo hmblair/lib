@@ -201,7 +201,7 @@ class TransformerWithoutPositionalEncoding(nn.Module):
 
 
 
-class TransformerWithSinusoidalPositionalEncoding(nn.Module):
+class TransformerWithSinusoidalPositionalEncoding(TransformerWithoutPositionalEncoding):
     """
     A transformer model.
 
