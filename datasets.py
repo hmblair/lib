@@ -142,7 +142,6 @@ class VariableLengthIterableHDF5Dataset(VariableLengthIterableDataset):
     def __init__(
             self, 
             path : str,
-            table : str,
             root_uep : str,
             batch_size : int,
             *args, **kwargs,
