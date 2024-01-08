@@ -116,6 +116,7 @@ class LoRACallback(BaseFinetuning):
             unfreeze_epoch : int,
             pt_model : str = 'pt_model',
             ) -> None:
+        super().__init__()
         self.lora_rank = lora_rank
         self.unfreeze_epoch = unfreeze_epoch
         self.pt_model = pt_model
