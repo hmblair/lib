@@ -6,6 +6,7 @@ from torch import nn
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_info
 from pytorch_lightning.utilities.model_summary import summarize
+from typing import Any
 
 class LoRALayerWrapper(nn.Module):
     """
@@ -42,7 +43,7 @@ class LoRALayerWrapper(nn.Module):
         weight_shape = self.base_module.weight.shape
 
         self.lora_A = nn.Parameter(
-            torch.zeros(weight_shape[0], lora_rank, device=device)
+            torch.zeros(lora_rank, weight_shape[0], device=device)
         )
                 
         self.lora_B = nn.Parameter(
@@ -65,7 +66,7 @@ class LoRALayerWrapper(nn.Module):
         base_out = self.base_module(x)  
 
         # add on the LoRA perturbation
-        return base_out + (x @ self.lora_A) @ self.lora_B.T 
+        return base_out + self.lora_B @ (self.lora_A @ x)
     
 
 def is_leaf_module(module: nn.Module) -> bool:
@@ -207,3 +208,19 @@ class LoRACallback(BaseFinetuning):
             # print a model summary showing the updated number of trainable 
             # parameters
             rank_zero_info(summarize(pl_module))
+
+
+    def on_before_save_checkpoint(
+            self, 
+            trainer : pl.Trainer, 
+            pl_module : pl.LightningModule, 
+            checkpoint: dict[str, Any],
+            ) -> None:
+        """
+        Called by Lightning just before saving a checkpoint. This method 
+        modifies the checkpoint file to only save the LoRA parameters.
+        """
+        checkpoint['state_dict'] = {
+            name : param for name, param in pl_module.state_dict().items()
+            if 'lora' in name
+        }
