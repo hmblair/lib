@@ -172,7 +172,7 @@ class LoRACallback(BaseFinetuning):
         optimizer (torch.optim.Optimizer):
             The optimizer being used to train the model.
         """
-        lora_params = getattr(pl_module, 'lora_params', None)
+        lora_params = getattr(getattr(pl_module, self.pt_model), 'lora_params', None)
         if epoch == self.unfreeze_epoch:
             rank_zero_info(
                 f'We have reached the unfreeze epoch of {self.unfreeze_epoch}.' \
