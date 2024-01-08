@@ -43,11 +43,11 @@ class LoRALayerWrapper(nn.Module):
         weight_shape = self.base_module.weight.shape
 
         self.lora_A = nn.Parameter(
-            torch.zeros(lora_rank, weight_shape[0], device=device)
+            torch.randn(lora_rank, weight_shape[1], device=device)
         )
                 
         self.lora_B = nn.Parameter(
-            torch.randn(weight_shape[1], lora_rank, device=device)
+            torch.zeros(weight_shape[0], lora_rank, device=device)
         )
 
 
@@ -66,24 +66,8 @@ class LoRALayerWrapper(nn.Module):
         base_out = self.base_module(x)  
 
         # add on the LoRA perturbation
-        return base_out + self.lora_B @ (self.lora_A @ x)
-    
+        return base_out + (x @ self.lora_A.T) @ self.lora_B.T
 
-def is_leaf_module(module: nn.Module) -> bool:
-    """
-    Returns True if the module has no children.
-
-    Parameters:
-    -----------
-    module (nn.Module): 
-        The module to be checked.
-
-    Returns:
-    --------
-    bool:
-        True if the module has no children.
-    """
-    return not list(module.children())
 
 
 def wrap_with_lora(
@@ -114,12 +98,14 @@ def wrap_with_lora(
         The LoRA parameters.
     """
     lora_params = []
-    for module in base_module.modules():
+    for name, module in base_module.named_modules():
         if isinstance(module, nn.Linear):
-            # wrap the LoRA layer around the module
-            module = LoRALayerWrapper(module, lora_rank, device) 
+            # construct the LoRA layer
+            lora_module = LoRALayerWrapper(module, lora_rank, device) 
+            # replace the module with the LoRA layer
+            setattr(base_module, name, lora_module)
             # store the LoRA parameters
-            lora_params += [module.lora_A, module.lora_B] 
+            lora_params += [lora_module.lora_A, lora_module.lora_B] 
     # collect the LoRA parameters and set them to be untrainable
     lora_params = nn.ParameterList(lora_params).requires_grad_(False)
     if hasattr(base_module, 'lora_params'):
