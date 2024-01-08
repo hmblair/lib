@@ -25,8 +25,8 @@ class LoRALayerWrapper(nn.Module):
 
     Attributes:
     -----------
-    base_module (nn.Module): 
-        The base module being wrapped.
+    base_module (nn.Linear): 
+        The base module being wrapped. It should be an instance of nn.Linear.
     lora_A (nn.Parameter): 
         LoRA weight A.
     lora_B (nn.Parameter): 
@@ -34,11 +34,16 @@ class LoRALayerWrapper(nn.Module):
     """
     def __init__(
             self, 
-            base_module: nn.Module, 
+            base_module: nn.Linear, 
             lora_rank: int, 
-            device: Union[str, torch.device]
+            device: Union[str, torch.device],
+            frozen : bool = True,
             ) -> None:
         super().__init__()
+        if not isinstance(base_module, nn.Linear):
+            raise ValueError(
+                'The base module must be an instance of nn.Linear.'
+                )
         self.base_module = base_module
         weight_shape = self.base_module.weight.shape
 
@@ -49,6 +54,10 @@ class LoRALayerWrapper(nn.Module):
         self.lora_B = nn.Parameter(
             torch.zeros(weight_shape[0], lora_rank, device=device)
         )
+
+        if frozen:
+            self.lora_A.requires_grad_(False)
+            self.lora_B.requires_grad_(False)
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -70,11 +79,19 @@ class LoRALayerWrapper(nn.Module):
 
 
 
+def unfreeze_lora_params(module: nn.Module) -> None:
+    for module in module.modules():
+        if isinstance(module, LoRALayerWrapper):
+            module.lora_A.requires_grad_(True)
+            module.lora_B.requires_grad_(True)
+
+
 def wrap_with_lora(
-        base_module: nn.Module, 
+        module: nn.Module, 
         lora_rank: int, 
-        device: Union[str, torch.device]
-        ) -> nn.ParameterList:
+        device: Union[str, torch.device],
+        frozen : bool = True,
+        ) -> None:
     """
     Wraps a pre-trained nn.Module with a LoRA layer. Unlike the LoraLayerWrapper
     class, this wraps all leaf modules in the base module. The base module is 
@@ -85,36 +102,40 @@ def wrap_with_lora(
 
     Parameters:
     -----------
-    base_module (nn.Module): 
+    module (nn.Module): 
         The base module to be wrapped.
     lora_rank (int): 
         The rank of the LoRA layer.
     device (str | torch.device): 
         The device to initialise the LoRA weights on.
-
-    Returns:
-    --------
-    nn.ParameterList:
-        The LoRA parameters.
     """
-    lora_params = []
-    for name, module in base_module.named_modules():
-        if isinstance(module, nn.Linear):
-            # construct the LoRA layer
-            lora_module = LoRALayerWrapper(module, lora_rank, device) 
-            # replace the module with the LoRA layer
-            setattr(base_module, name, lora_module)
-            # store the LoRA parameters
-            lora_params += [lora_module.lora_A, lora_module.lora_B] 
-    # collect the LoRA parameters and set them to be untrainable
-    lora_params = nn.ParameterList(lora_params).requires_grad_(False)
-    if hasattr(base_module, 'lora_params'):
-        raise ValueError(
-            'The base module already has an attribute called lora_params. ' \
-            'Please rename this attribute if you wish to use the LoRACallback.'
-            )
-    setattr(base_module, 'lora_params', nn.ParameterList(lora_params))
-    return lora_params    
+    for name, child in module.named_children():
+        if isinstance(child, nn.Linear):
+            # Wrap the linear layer
+            wrapped = LoRALayerWrapper(child, lora_rank, device, frozen)
+            setattr(module, name, wrapped)
+        else:
+            # Recursively replace in child modules
+            wrap_with_lora(child, lora_rank, device, frozen)
+
+    # lora_params = []
+    # for name, module in base_module.named_modules():
+    #     if isinstance(module, nn.Linear):
+    #         # construct the LoRA layer
+    #         lora_module = LoRALayerWrapper(module, lora_rank, device) 
+    #         # replace the module with the LoRA layer
+    #         setattr(base_module, name, lora_module)
+    #         # store the LoRA parameters
+    #         lora_params += [lora_module.lora_A, lora_module.lora_B] 
+    # # collect the LoRA parameters and set them to be untrainable
+    # lora_params = nn.ParameterList(lora_params).requires_grad_(False)
+    # if hasattr(base_module, 'lora_params'):
+    #     raise ValueError(
+    #         'The base module already has an attribute called lora_params. ' \
+    #         'Please rename this attribute if you wish to use the LoRACallback.'
+    #         )
+    # setattr(base_module, 'lora_params', nn.ParameterList(lora_params))
+    # return lora_params    
 
 
 
@@ -134,8 +155,8 @@ class LoRACallback(BaseFinetuning):
 
     def freeze_before_training(self, pl_module: pl.LightningModule) -> None:
         """
-        Wraps the pre-trained model with LoRA layers, and freezes the LoRA
-        parameters.
+        Wraps the pre-trained model with LoRA layers, which are initialised as
+        untrainable.
 
         Parameters:
         -----------
@@ -147,6 +168,7 @@ class LoRACallback(BaseFinetuning):
                 getattr(pl_module, self.pt_model),
                 self.lora_rank, 
                 pl_module.device,
+                frozen=True,
                 )
         else:
             raise ValueError(
@@ -172,25 +194,17 @@ class LoRACallback(BaseFinetuning):
         optimizer (torch.optim.Optimizer):
             The optimizer being used to train the model.
         """
-        lora_params = getattr(getattr(pl_module, self.pt_model), 'lora_params', None)
         if epoch == self.unfreeze_epoch:
             rank_zero_info(
                 f'We have reached the unfreeze epoch of {self.unfreeze_epoch}.' \
                 ' Unfreezing the LoRA parameters...'
                 )
-            if lora_params is None:
-                raise ValueError(
-                    'The LoRA parameters have not been initialised, but the ' \
-                    'unfreeze epoch has been reached. Please check that the ' \
-                    'LoRACallback is being used correctly.'
-                )
             # unfreeze the LoRA parameters
-            for param in lora_params:
-                param.requires_grad_(True) 
-            # add the LoRA parameters to the optimizer
-            optimizer.add_param_group(
-                {'params': lora_params, 'lr': optimizer.defaults['lr']}
-            )
+            unfreeze_lora_params(getattr(pl_module, self.pt_model))
+            # # add the LoRA parameters to the optimizer
+            # optimizer.add_param_group(
+            #     {'params': lora_params, 'lr': optimizer.defaults['lr']}
+            # )
             # print a model summary showing the updated number of trainable 
             # parameters
             rank_zero_info(summarize(pl_module))
