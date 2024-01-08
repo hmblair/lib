@@ -8,11 +8,11 @@ from pytorch_lightning.utilities import rank_zero_info
 from pytorch_lightning.utilities.model_summary import summarize
 from typing import Any
 
-class LoRALayerWrapper(nn.Module):
+class LoRALayerWrapper(nn.Linear):
     """
-    An nn.Module wrapper which adds a LoRA layer to the output of the base
-    module. By replacing the base module with this wrapper, a single LoRA layer
-    can be added to a pre-trained model.
+    A wrapper class for nn.Linear modules which adds a LoRA perturbation to the
+    output of the base module. By replacing the base module with this wrapper, 
+    a single LoRA layer can be added to a pre-trained model.
 
     Parameters:
     -----------
@@ -20,8 +20,9 @@ class LoRALayerWrapper(nn.Module):
         The base module to be wrapped.
     lora_rank (int): 
         The rank of the LoRA layer.
-    device (str | torch.device): 
-        The device to initialise the LoRA weights on.
+    frozen (bool):
+        Whether the LoRA parameters should be frozen. If True, the LoRA 
+        parameters will be initialised as untrainable.
 
     Attributes:
     -----------
@@ -31,28 +32,40 @@ class LoRALayerWrapper(nn.Module):
         LoRA weight A.
     lora_B (nn.Parameter): 
         LoRA weight B.
+
+    Inherits:
+    ---------
+    nn.Linear: 
+        Pytorch linear layer base class.
     """
     def __init__(
             self, 
             base_module: nn.Linear, 
             lora_rank: int, 
-            device: Union[str, torch.device],
             frozen : bool = True,
             ) -> None:
-        super().__init__()
         if not isinstance(base_module, nn.Linear):
             raise ValueError(
                 'The base module must be an instance of nn.Linear.'
                 )
-        self.base_module = base_module
-        weight_shape = self.base_module.weight.shape
+        super().__init__(
+            base_module.in_features, 
+            base_module.out_features, 
+            bias=base_module.bias is not None,
+            device=base_module.weight.device,
+            dtype=base_module.weight.dtype,
+        )
+        self.weight = base_module.weight
+        self.bias = base_module.bias
+        
+        weight_shape = self.weight.shape
 
         self.lora_A = nn.Parameter(
-            torch.randn(lora_rank, weight_shape[1], device=device)
+            torch.randn(lora_rank, weight_shape[1], device=self.weight.device)
         )
                 
         self.lora_B = nn.Parameter(
-            torch.zeros(weight_shape[0], lora_rank, device=device)
+            torch.zeros(weight_shape[0], lora_rank, device=self.weight.device)
         )
 
         if frozen:
@@ -72,7 +85,7 @@ class LoRALayerWrapper(nn.Module):
             adding on the LoRA perturbation.
         """
         # compute the output of the base module
-        base_out = self.base_module(x)  
+        base_out = super().forward(x)  
 
         # add on the LoRA perturbation
         return base_out + (x @ self.lora_A.T) @ self.lora_B.T
