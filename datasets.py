@@ -32,8 +32,7 @@ def slice_output(func):
 
 class SimpleDataset(Dataset):
     """
-    A simple PyTorch dataset, that allows for indexing the input and target
-    tensors.
+    A simple PyTorch dataset, that allows for indexing a sequence of tensors.
 
     Parameters
     ----------
@@ -43,22 +42,21 @@ class SimpleDataset(Dataset):
         The target tensor.
     """
     def __init__(
-            self, x : torch.Tensor, y : torch.Tensor, 
+            self, *tensors : Sequence[torch.Tensor], 
             ) -> None:
         super().__init__()
-        if not len(x) == len(y):
+        if not all(len(tensor) == len(tensors[0]) for tensor in tensors):
             raise ValueError(
-                'The input and target tensors must have the same length.'
+                'All tensors must have the same length.'
                 )
-        self.x = x
-        self.y = y
+        self.tensors = tensors
 
 
     def __len__(self) -> int:
         """
         Return the length of the dataset.
         """
-        return len(self.x)
+        return len(self.tensors[0])
 
 
     def __getitem__(
@@ -66,7 +64,7 @@ class SimpleDataset(Dataset):
             idx : Union[int, list, slice],
             ) -> tuple[torch.Tensor, torch.Tensor]:
         """
-        Return the input and target tensors for a given index.
+        Return all tensors at the given index.
 
         Parameters
         ----------
@@ -78,7 +76,7 @@ class SimpleDataset(Dataset):
         tuple[torch.Tensor, torch.Tensor]
             The input and target tensors.
         """
-        return self.x[idx], self.y[idx]
+        return tuple(tensor[idx] for tensor in self.tensors)
     
 
 
