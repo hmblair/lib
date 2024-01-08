@@ -12,6 +12,7 @@ class FineTuningScheduler(BaseFinetuning):
             unfreeze_rate : int, 
             pt_model : str = 'pt_model',
             ) -> None:
+        super().__init__()
         self.unfreeze_rate = unfreeze_rate
         self.pt_model = pt_model
         self._unfreeze_iter = layers_to_unfreeze
