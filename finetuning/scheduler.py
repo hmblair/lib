@@ -21,9 +21,10 @@ class FineTuningScheduler(BaseFinetuning):
         if self.unfreeze_rate == 0:
             return
         try:
-            getattr(pl_module, self.pt_model).freeze()
-        except Exception as e:
-            raise ValueError(
+            getattr(pl_module, self.pt_model).requires_grad_(False)
+            getattr(pl_module, self.pt_model).eval()
+        except AttributeError as e:
+            raise AttributeError(
                 f'Cannot find {self.pt_model} in the LightningModule. '
                 'Please check the name of the attribute.'
             ) from e
