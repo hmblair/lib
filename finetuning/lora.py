@@ -114,7 +114,7 @@ def wrap_with_lora(
     """
     lora_params = []
     for module in base_module.modules():
-        if is_leaf_module(module):
+        if isinstance(module, nn.Linear):
             # wrap the LoRA layer around the module
             module = LoRALayerWrapper(module, lora_rank, device) 
             # store the LoRA parameters
