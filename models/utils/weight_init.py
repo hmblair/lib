@@ -5,6 +5,7 @@ from typing import Union
 from pytorch_lightning.utilities import rank_zero_warn
 from abc import ABCMeta, abstractmethod
 
+
 class WeightInitialisationMetaClass(ABCMeta):
     """
     A metaclass that automatically calls the _weight_init() method of a class
@@ -37,7 +38,6 @@ class WeightInitialisationMetaClass(ABCMeta):
 def xavier_init(
         m : nn.Module, 
         gain : Union[str, float] = 'relu', 
-        verbose : bool = False,
         ) -> None:
     """
     Initializes the given module using Xavier/Glorot initialization, as 
@@ -68,10 +68,6 @@ def xavier_init(
         nn.init.xavier_uniform_(m.weight, gain)
         if m.bias is not None:
             nn.init.constant_(m.bias, 0)
-    elif isinstance(m, nn.Conv2d):
-        nn.init.xavier_uniform_(m.weight, gain)
-        if m.bias is not None:
-            nn.init.constant_(m.bias, 0)
     elif isinstance(m, nn.Embedding):
         nn.init.xavier_uniform_(m.weight, gain)
         if m.padding_idx is not None:
@@ -90,3 +86,24 @@ def xavier_init(
             )
         pass
 
+
+def he_init(
+        m : nn.Module, 
+        gain : Union[str, float] = 'relu', 
+        ) -> None:
+    """
+    Initializes the given module using He initialization, as described in
+    'Delving Deep into Rectifiers: Surpassing Human-Level Performance on
+    ImageNet Classification'.
+
+    Parameters:
+    -----------
+    m (nn.Module): 
+        The module to be initialized.
+    gain (Union[str, float]):
+        The gain factor for the given activation function. Defaults to 'relu'.
+        If a string is given, the gain factor is calculated using the given 
+        string via nn.init.calculate_gain.
+    """
+    raise NotImplementedError
+    
