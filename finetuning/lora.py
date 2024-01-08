@@ -130,7 +130,6 @@ class LoRACallback(BaseFinetuning):
         self.lora_rank = lora_rank
         self.unfreeze_epoch = unfreeze_epoch
         self.pt_model = pt_model
-        self.lora_params = None
     
 
     def freeze_before_training(self, pl_module: pl.LightningModule) -> None:
@@ -144,7 +143,7 @@ class LoRACallback(BaseFinetuning):
             The LightningModule to be fine-tuned.
         """
         if hasattr(pl_module, self.pt_model):
-            self.lora_params = wrap_with_lora(
+            wrap_with_lora(
                 getattr(pl_module, self.pt_model),
                 self.lora_rank, 
                 pl_module.device,
@@ -173,23 +172,24 @@ class LoRACallback(BaseFinetuning):
         optimizer (torch.optim.Optimizer):
             The optimizer being used to train the model.
         """
+        lora_params = getattr(pl_module, 'lora_params', None)
         if epoch == self.unfreeze_epoch:
             rank_zero_info(
                 f'We have reached the unfreeze epoch of {self.unfreeze_epoch}.' \
                 ' Unfreezing the LoRA parameters...'
                 )
-            if self.lora_params is None:
+            if lora_params is None:
                 raise ValueError(
                     'The LoRA parameters have not been initialised, but the ' \
                     'unfreeze epoch has been reached. Please check that the ' \
                     'LoRACallback is being used correctly.'
                 )
             # unfreeze the LoRA parameters
-            for param in self.lora_params:
+            for param in lora_params:
                 param.requires_grad_(True) 
             # add the LoRA parameters to the optimizer
             optimizer.add_param_group(
-                {'params': self.lora_params, 'lr': optimizer.defaults['lr']}
+                {'params': lora_params, 'lr': optimizer.defaults['lr']}
             )
             # print a model summary showing the updated number of trainable 
             # parameters
