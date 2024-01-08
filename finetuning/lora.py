@@ -179,7 +179,7 @@ class LoRACallback(BaseFinetuning):
                 param.requires_grad_(True) 
             # add the LoRA parameters to the optimizer
             optimizer.add_param_group(
-                {'lora_params': self.lora_params, 'lr': optimizer.defaults['lr']}
+                {'params': self.lora_params, 'lr': optimizer.defaults['lr']}
             )
             # print a model summary showing the updated number of trainable 
             # parameters
