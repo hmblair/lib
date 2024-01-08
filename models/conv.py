@@ -122,9 +122,10 @@ class CNN(nn.Module):
             conv_bias : bool = True,
             pooling_kernel_size : Optional[int] = None,
             dilation : int = 1,
-            activation : nn.Module = nn.ReLU()
+            activation : nn.Module = nn.ReLU(),
+            *args, **kwargs
             ) -> None:
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
         self.embedding = nn.Embedding(num_embeddings,
             embedding_dim = hidden_sizes[0]
@@ -180,8 +181,9 @@ class BareCNN(nn.Module):
             num_layers : int,       
             dropout : float = 0.0,
             conv_bias : bool = True,
+            *args, **kwargs
             ) -> None:
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
         self.embedding = nn.Embedding(num_embeddings, hidden_size)
         layers = []
