@@ -15,7 +15,7 @@ class FineTuningScheduler(BaseFinetuning):
         super().__init__()
         self.unfreeze_rate = unfreeze_rate
         self.pt_model = pt_model
-        self._unfreeze_iter = layers_to_unfreeze
+        self._unfreeze_iter = iter(layers_to_unfreeze)
     
 
     def freeze_before_training(self, pl_module: pl.LightningModule) -> None:
