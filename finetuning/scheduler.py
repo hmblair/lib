@@ -15,7 +15,14 @@ class FineTuningScheduler(BaseFinetuning):
         super().__init__()
         self.unfreeze_rate = unfreeze_rate
         self.pt_model = pt_model
-        self._unfreeze_iter = iter(layers_to_unfreeze)
+        unfreeze_epochs = range(
+            unfreeze_rate, 
+            (len(layers_to_unfreeze) + 1) * unfreeze_rate, 
+            unfreeze_rate,
+        )
+        self._unfreeze_dict = dict(
+            zip(unfreeze_epochs, layers_to_unfreeze)
+            )
     
 
     def freeze_before_training(self, pl_module: pl.LightningModule) -> None:
@@ -37,7 +44,9 @@ class FineTuningScheduler(BaseFinetuning):
             epoch: int, 
             optimizer: torch.optim.Optimizer,
             ) -> None:
-        if epoch > 0 and epoch % self.unfreeze_rate == 0:
+        if epoch in self._unfreeze_epochs:
             i = next(self._unfreeze_iter)
-            getattr(pl_module, self.pt_model)[i].requires_grad_(True)
+            getattr(pl_module, self.pt_model)[
+                self._unfreeze_dict[epoch]
+            ].requires_grad_(True)
             print(summarize(pl_module))
