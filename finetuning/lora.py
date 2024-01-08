@@ -102,7 +102,6 @@ def unfreeze_lora_params(module: nn.Module) -> None:
 def wrap_with_lora(
         module: nn.Module, 
         lora_rank: int, 
-        device: Union[str, torch.device],
         frozen : bool = True,
         ) -> None:
     """
@@ -119,17 +118,15 @@ def wrap_with_lora(
         The base module to be wrapped.
     lora_rank (int): 
         The rank of the LoRA layer.
-    device (str | torch.device): 
-        The device to initialise the LoRA weights on.
     """
     for name, child in module.named_children():
         if isinstance(child, nn.Linear):
             # Wrap the linear layer
-            wrapped = LoRALayerWrapper(child, lora_rank, device, frozen)
+            wrapped = LoRALayerWrapper(child, lora_rank, frozen)
             setattr(module, name, wrapped)
         else:
             # Recursively replace in child modules
-            wrap_with_lora(child, lora_rank, device, frozen)
+            wrap_with_lora(child, lora_rank, frozen)
 
     # lora_params = []
     # for name, module in base_module.named_modules():
@@ -180,7 +177,6 @@ class LoRACallback(BaseFinetuning):
             wrap_with_lora(
                 getattr(pl_module, self.pt_model),
                 self.lora_rank, 
-                pl_module.device,
                 frozen=True,
                 )
         else:
