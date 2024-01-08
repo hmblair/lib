@@ -121,6 +121,11 @@ def wrap_with_lora(
             lora_params += [module.lora_A, module.lora_B] 
     # collect the LoRA parameters and set them to be untrainable
     lora_params = nn.ParameterList(lora_params).requires_grad_(False)
+    if hasattr(base_module, 'lora_params'):
+        raise ValueError(
+            'The base module already has an attribute called lora_params. ' \
+            'Please rename this attribute if you wish to use the LoRACallback.'
+            )
     setattr(base_module, 'lora_params', nn.ParameterList(lora_params))
     return lora_params    
 
