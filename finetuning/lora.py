@@ -92,11 +92,18 @@ class LoRALayerWrapper(nn.Linear):
 
 
 
-def unfreeze_lora_params(module: nn.Module) -> None:
+def unfreeze_lora_params(module: nn.Module, optimizer : torch.optim.Optimizer = None) -> None:
+    lora_params = []
     for module in module.modules():
         if isinstance(module, LoRALayerWrapper):
             module.lora_A.requires_grad_(True)
             module.lora_B.requires_grad_(True)
+            lora_params += [module.lora_A, module.lora_B]
+    lora_params = nn.ParameterList(lora_params)
+    if optimizer is not None:
+        optimizer.add_param_group(
+            {'params': lora_params, 'lr': optimizer.defaults['lr']}
+        )
 
 
 def wrap_with_lora(
@@ -210,7 +217,7 @@ class LoRACallback(BaseFinetuning):
                 )
             # unfreeze the LoRA parameters
             unfreeze_lora_params(getattr(pl_module, self.pt_model))
-            # # add the LoRA parameters to the optimizer
+            # add the LoRA parameters to the optimizer
             # optimizer.add_param_group(
             #     {'params': lora_params, 'lr': optimizer.defaults['lr']}
             # )
