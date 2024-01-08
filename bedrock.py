@@ -7,8 +7,8 @@ import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
 import psutil
 
-from .model_utils.hook import HookList, patch_and_register_layer_hooks
-from .model_utils.weight_init import xavier_init
+from .models.utils.hook import HookList, patch_and_register_layer_hooks
+from .models.utils.weight_init import xavier_init
 
 from torch.utils.data import DataLoader
 import os
@@ -128,7 +128,7 @@ def catch_and_log_errors(f : Callable) -> Callable:
 
 
 
-from .model_utils.weight_init import WeightInitialisationMetaClass
+from .models.utils.weight_init import WeightInitialisationMetaClass
 from abc import abstractmethod
 class BedrockModel(pl.LightningModule, metaclass=WeightInitialisationMetaClass):
     """
@@ -985,3 +985,174 @@ class BedrockFinetuningModel(BedrockModel):
         # yield the pre-trained model by default
         yield self.pt_model 
     
+
+
+
+
+
+
+
+import torch
+import torch.nn as nn
+from typing import Callable, Optional, Union, Any
+from .models.utils.hook import HookContextManager
+from .visualisation.plotting import image_grid
+
+def patch_attn_to_return_weights(
+        m : nn.MultiheadAttention,
+        average_attn_weights : Optional[bool] = None,
+        ) -> None:
+    """
+    Force the attention module to return the attention weights.
+
+    Parameters:
+    ----------
+    m (nn.MultiheadAttention): 
+        The attention module.
+    average_attn_weights (bool | None):
+        Whether to average the attention weights across the heads. If None,
+        then the default setting of the attention module is used. The reason 
+        to use None is that some attention modules do not have this setting.
+    """
+    forward_orig = m.forward
+
+    def wrap(*args, **kwargs):
+        kwargs["need_weights"] = True
+        if average_attn_weights is not None:
+            kwargs["average_attn_weights"] = average_attn_weights
+        return forward_orig(*args, **kwargs)
+
+    m.forward = wrap
+
+
+class AttentionWeightsHook(HookContextManager):
+    """
+    A hook that saves the attention weights of a transformer or attention layer.
+    The weights are saved in a list, which can be retrieved using the
+    get_weights method.
+
+    Parameters:
+    ----------
+    model (nn.Module):
+        The model to register the hook on.
+    layer_type (tuple[type[nn.Module]]):
+        The type of layer to register the hook on.
+
+    Attributes:
+    ----------
+    outputs (list[torch.Tensor]):
+        A list to store the attention weights.
+    """
+    def __init__(self, model : nn.Module, layer_type : tuple[type[nn.Module]]):
+        super().__init__(
+            module=model,
+            layer_type=layer_type,
+            patch=patch_attn_to_return_weights,
+            )
+        # a list to store the attention weights
+        self.outputs = []
+
+
+    def __call__(
+            self, 
+            module : nn.Module, 
+            module_in : Any, 
+            module_out : Any,
+            ) -> None:
+        """
+        Save the attention weights of the given module.
+        
+        Parameters:
+        ----------
+        module (nn.Module):
+            The module whose attention weights are to be saved.
+        module_in (Any):
+            The input to the module.
+        module_out (Any):
+            The output of the module.
+        """
+        self.outputs.append(
+            module_out[1].detach()
+            )
+
+
+    def get_weights(self) -> torch.Tensor:
+        """
+        Get the attention weights of the model, as saved by the hook.
+
+        Returns:
+        --------
+        torch.Tensor: 
+            The attention weights of the model, of shape 
+            (*, n_layers, n_heads, seq_len, seq_len).
+        """
+        return torch.stack(self.outputs, dim=1)
+    
+
+
+def get_attn_layer(model : type[nn.Module]) -> nn.Module:
+    """
+    Get the attention layer of the given model, which should be an instance of
+    one of the following classes: nn.MultiheadAttention, 
+    nn.TransformerEncoderLayer, nn.TransformerDecoderLayer.
+
+    Parameters:
+    ----------
+    model (AttentiveModule): 
+        The model to get the attention layer from.
+
+    Returns:
+    --------
+    nn.Module: 
+        The attention layer of the model. If the model is an instance of
+        nn.MultiheadAttention, then the model itself is returned. Else, 
+        the self-attention module of the model is returned.
+    """
+    return model if isinstance(model, nn.MultiheadAttention) else model.self_attn
+
+
+
+class BaseAttentionModel(BedrockModel):
+    def __init__(
+            self, 
+            attn_layer_type : tuple[type[nn.Module]] = (nn.MultiheadAttention,), 
+            *args, **kwargs,
+            ):
+        super().__init__(*args, **kwargs)
+        self.attn_layer_type = attn_layer_type
+
+    
+    def get_attn_weights(self, x : torch.Tensor) -> torch.Tensor:
+        """
+        Get the attention weights of each layer of the model when the given 
+        input is passed through the model.
+
+        Parameters:
+        ----------
+        x (torch.Tensor): 
+            The input to the model, of shape (*, seq_len, d_model)
+
+        Returns:
+        --------
+        torch.Tensor: 
+            The attention weights of the model, of shape 
+            (*, n_layers, n_heads, seq_len, seq_len)
+        """
+        with AttentionWeightsHook(self, self.attn_layer_type) as hook:
+            self(x)
+        return hook.get_weights()
+    
+
+    def plot_attention_weights(self, x : torch.Tensor) -> None:
+        """
+        Plot the attention weights of each layer of the model when the given 
+        input is passed through the model.
+
+        Parameters:
+        ----------
+        x (torch.Tensor): 
+            The input to the model, of shape (*, seq_len, d_model)
+        """
+        weights = self.get_attn_weights(x)
+        for input in weights:
+            image_grid(input, grid_size=(3, 4))
