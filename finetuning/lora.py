@@ -104,7 +104,9 @@ def wrap_with_lora(
             # store the LoRA parameters
             lora_params += [module.lora_A, module.lora_B] 
     # collect the LoRA parameters and set them to be untrainable
-    return nn.ParameterList(lora_params).requires_grad_(False)
+    lora_params = nn.ParameterList(lora_params)
+    setattr(base_module, 'lora_params', nn.ParameterList(lora_params))
+    return lora_params
 
 
 
