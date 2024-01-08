@@ -68,6 +68,22 @@ class LoRALayerWrapper(nn.Module):
         return base_out + (x @ self.lora_A) @ self.lora_B.T 
     
 
+def is_leaf_module(module: nn.Module) -> bool:
+    """
+    Returns True if the module has no children.
+
+    Parameters:
+    -----------
+    module (nn.Module): 
+        The module to be checked.
+
+    Returns:
+    --------
+    bool:
+        True if the module has no children.
+    """
+    return not list(module.children())
+
 
 def wrap_with_lora(
         base_module: nn.Module, 
@@ -98,7 +114,7 @@ def wrap_with_lora(
     """
     lora_params = []
     for module in base_module.modules():
-        if not module.children(): 
+        if is_leaf_module(module):
             # wrap the LoRA layer around the module
             module = LoRALayerWrapper(module, lora_rank, device) 
             # store the LoRA parameters
@@ -106,7 +122,7 @@ def wrap_with_lora(
     # collect the LoRA parameters and set them to be untrainable
     lora_params = nn.ParameterList(lora_params)
     setattr(base_module, 'lora_params', nn.ParameterList(lora_params))
-    return lora_params
+    return lora_params    
 
 
 
