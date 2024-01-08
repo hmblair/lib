@@ -44,8 +44,7 @@ class FineTuningScheduler(BaseFinetuning):
             epoch: int, 
             optimizer: torch.optim.Optimizer,
             ) -> None:
-        if epoch in self._unfreeze_epochs:
-            i = next(self._unfreeze_iter)
+        if epoch in self._unfreeze_dict:
             getattr(pl_module, self.pt_model)[
                 self._unfreeze_dict[epoch]
             ].requires_grad_(True)
