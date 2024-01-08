@@ -183,6 +183,3 @@ class LoRACallback(BaseFinetuning):
             # print a model summary showing the updated number of trainable 
             # parameters
             rank_zero_info(summarize(pl_module))
-
-
-breakpoint()
