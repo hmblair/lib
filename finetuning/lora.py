@@ -144,7 +144,7 @@ def wrap_with_lora(
             setattr(module, name, wrapped)
         else:
             # Recursively replace in child modules
-            wrap_with_lora(child, lora_rank, frozen)   
+            wrap_with_lora(child, lora_rank, frozen, debug)   
 
 
 
