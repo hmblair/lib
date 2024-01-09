@@ -2,6 +2,9 @@ from typing import Optional, Tuple, Union, Callable, Any
 import torch
 import torch.nn as nn
 
+from .utils.weight_init import xavier_init
+from .utils.misc import is_leaf_module
+
 class SinusoidalPositionalEncoding(nn.Module):
     """
     Implements a sinusoidal positional encoding layer.
@@ -122,6 +125,11 @@ class BareTransformer(nn.Module):
         # final linear layer
         self.linear = nn.Linear(embed_dim, output_dim)
 
+        # initialize the weights
+        for module in self.modules():
+            if is_leaf_module(module):
+                xavier_init(module)
+
     
     @staticmethod
     def build_transformer(
@@ -231,6 +239,9 @@ class TransformerWithSinusoidalPositionalEncoding(BareTransformer):
 
         # embedding layer
         self.embedding = nn.Embedding(num_embeddings, embed_dim)
+
+        # initialize the weights of the embedding layer
+        xavier_init(self.embedding)
 
         # positional encoding layer
         self.positional_encoding = SinusoidalPositionalEncoding(k)
@@ -396,6 +407,35 @@ class TransformerWithSinusoidalPositionalEncoding(BareTransformer):
     #     x = self.linear(x).squeeze(-1) 
     #     return torch.mean(x, dim=-1, keepdim=True)
     
+    
+import torch.nn.init as init
+def init_multihead_attention(m : nn.Module) -> None:
+    init.xavier_uniform_(m.in_proj_weight)
+
+    # If using separate weight matrices for q, k, v (if in_proj_weight is None)
+    if m.q_proj_weight is not None:
+        init.xavier_uniform_(m.q_proj_weight)
+    if m.k_proj_weight is not None:
+        init.xavier_uniform_(m.k_proj_weight)
+    if m.v_proj_weight is not None:
+        init.xavier_uniform_(m.v_proj_weight)
+
+    # Initialize biases to zero if they exist
+    if m.in_proj_bias is not None:
+        init.constant_(m.in_proj_bias, 0)
+    if m.q_proj_bias is not None:
+        init.constant_(m.q_proj_bias, 0)
+    if m.k_proj_bias is not None:
+        init.constant_(m.k_proj_bias, 0)
+    if m.v_proj_bias is not None:
+        init.constant_(m.v_proj_bias, 0)
+
+    # Apply Xavier Uniform initialization to out_proj layer
+    if hasattr(m, 'out_proj'):
+        init.xavier_uniform_(m.out_proj.weight)
+        if m.out_proj.bias is not None:
+            init.constant_(m.out_proj.bias, 0)
+
 
 class MultiHeadSelfAttention(nn.Module):
     """
@@ -418,6 +458,10 @@ class MultiHeadSelfAttention(nn.Module):
             ) -> None:
         super().__init__()
         self.attention = nn.MultiheadAttention(embed_dim, num_heads, dropout)
+
+        # initialize the weights
+        init_multihead_attention(self.attention)
+
     
     def forward(self, x : torch.Tensor) -> torch.Tensor:
         """
@@ -438,16 +482,23 @@ class MultiHeadSelfAttention(nn.Module):
 
 import torch.nn.functional as F
 class MultiHeadSelfAttentionWithBias(nn.Module):
-    def __init__(self, num_heads : int, embed_dim : int, dropout : float = 0.0) -> None:
+    def __init__(
+            self, 
+            embed_dim : int, 
+            num_heads : int, 
+            dropout : float = 0.0,
+            ) -> None:
         super().__init__()
+        if not embed_dim % num_heads == 0:
+            raise ValueError(
+                f'Embedding dimension ({embed_dim}) must be divisible by the number of heads ({num_heads}).'
+                )
         self.num_heads = num_heads
         self.embed_dim = embed_dim
         self.dropout = dropout
 
         # linear layers for computing the query, key, value, and output tensors
-        self.query = nn.Linear(embed_dim, embed_dim)
-        self.key = nn.Linear(embed_dim, embed_dim)
-        self.value = nn.Linear(embed_dim, embed_dim)
+        self.input = nn.Linear(embed_dim, 3 * embed_dim)
         self.output = nn.Linear(embed_dim, embed_dim)
 
 
@@ -465,12 +516,11 @@ class MultiHeadSelfAttentionWithBias(nn.Module):
         features_per_head = self.embed_dim // self.num_heads # compute the number of features per head
 
         # Compute query, key, and value tensors
-        query = self.query(x).view(batch_size, seq_len, self.num_heads, features_per_head).transpose(1, 2)
-        key = self.key(x).view(batch_size, seq_len, self.num_heads, features_per_head).transpose(1, 2)
-        value = self.value(x).view(batch_size, seq_len, self.num_heads, features_per_head).transpose(1, 2)
+        qkv = self.input(x).view(3, batch_size, seq_len, self.num_heads, features_per_head).transpose
+
 
         # compute the attention scores
-        attention_scores = torch.einsum('bshd, bsvd -> bhsv', query, key) / (self.embed_dim // self.num_heads) ** 0.5
+        attention_scores = torch.einsum('bshd, bsvd -> bhsv', qkv[0], qkv[1]) / (self.embed_dim // self.num_heads) ** 0.5
 
         # add on the bias
         attention_scores = attention_scores + self._bias(x)
@@ -482,12 +532,12 @@ class MultiHeadSelfAttentionWithBias(nn.Module):
         attention_probs = F.dropout(attention_probs, p = self.dropout, training = self.training)
 
         # compute the attention output
-        attention_output = torch.einsum('bhsv, bsvd -> bshd', attention_probs, value)
+        attention_output = torch.einsum('bhsv, bsvd -> bshd', attention_probs, qkv[2])
 
         # reshape the attention output
-        attention_output = attention_output.reshape(batch_size, seq_len, self.embed_dim)
+        attention_output = attention_output.reshape(batch_size, seq_len, self.embed_dim).permute(1, 0, 2)
 
-        return attention_output
+        return self.output(attention_output)
     
 
     def _bias(self, x : torch.Tensor) -> Union[torch.Tensor, int]:

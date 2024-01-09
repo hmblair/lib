@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 from .transformers import MultiHeadSelfAttention
+from .utils.weight_init import xavier_init
 
 class BaseRNN(nn.Module):
     """
@@ -99,7 +100,15 @@ class BaseRNN(nn.Module):
             )
 
         # a linear layer to map to the output dimension
-        self.linear =nn.Linear(hidden_size * 2, output_dim)
+        self.linear = nn.Linear(hidden_size * 2, output_dim)
+
+        # initialize the weights
+        gain = nn.init.calculate_gain('relu')
+        for name, param in self.named_parameters():
+            if 'weight' in name and param.data.dim() == 2:
+                nn.init.xavier_uniform_(param, gain)
+            elif 'bias' in name:
+                nn.init.constant_(param, 0)
 
     
     def encode(self, x : torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
