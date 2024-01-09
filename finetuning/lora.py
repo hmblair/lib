@@ -91,15 +91,18 @@ class LoRALayerWrapper(nn.Linear):
         return base_out + (x @ self.lora_A.T) @ self.lora_B.T
 
 
-
-def unfreeze_lora_params(module: nn.Module, optimizer : torch.optim.Optimizer = None) -> None:
+def get_lora_params(module : nn.Module):
     lora_params = []
     for module in module.modules():
         if isinstance(module, LoRALayerWrapper):
-            module.lora_A.requires_grad_(True)
-            module.lora_B.requires_grad_(True)
             lora_params += [module.lora_A, module.lora_B]
-    lora_params = nn.ParameterList(lora_params)
+    return lora_params
+
+
+def unfreeze_lora_params(module: nn.Module, optimizer : torch.optim.Optimizer = None) -> None:
+    lora_params = nn.ParameterList(
+        get_lora_params(module)
+    )
     if optimizer is not None:
         optimizer.add_param_group(
             {'params': lora_params, 'lr': optimizer.defaults['lr']}
