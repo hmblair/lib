@@ -211,7 +211,7 @@ class LoRACallback(BaseFinetuning):
                 ' Unfreezing the LoRA parameters...'
                 )
             # unfreeze the LoRA parameters
-            unfreeze_lora_params(getattr(pl_module, self.pt_model))
+            unfreeze_lora_params(getattr(pl_module, self.pt_model), optimizer)
             # add the LoRA parameters to the optimizer
             # optimizer.add_param_group(
             #     {'params': lora_params, 'lr': optimizer.defaults['lr']}
