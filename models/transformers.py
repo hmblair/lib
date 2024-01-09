@@ -409,34 +409,6 @@ class TransformerWithSinusoidalPositionalEncoding(BareTransformer):
     
     
 import torch.nn.init as init
-def init_multihead_attention(m : nn.Module) -> None:
-    init.xavier_uniform_(m.in_proj_weight)
-
-    # If using separate weight matrices for q, k, v (if in_proj_weight is None)
-    if m.q_proj_weight is not None:
-        init.xavier_uniform_(m.q_proj_weight)
-    if m.k_proj_weight is not None:
-        init.xavier_uniform_(m.k_proj_weight)
-    if m.v_proj_weight is not None:
-        init.xavier_uniform_(m.v_proj_weight)
-
-    # Initialize biases to zero if they exist
-    if m.in_proj_bias is not None:
-        init.constant_(m.in_proj_bias, 0)
-    if m.q_proj_bias is not None:
-        init.constant_(m.q_proj_bias, 0)
-    if m.k_proj_bias is not None:
-        init.constant_(m.k_proj_bias, 0)
-    if m.v_proj_bias is not None:
-        init.constant_(m.v_proj_bias, 0)
-
-    # Apply Xavier Uniform initialization to out_proj layer
-    if hasattr(m, 'out_proj'):
-        init.xavier_uniform_(m.out_proj.weight)
-        if m.out_proj.bias is not None:
-            init.constant_(m.out_proj.bias, 0)
-
-
 class MultiHeadSelfAttention(nn.Module):
     """
     Implements a multi-head self-attention layer.
@@ -460,7 +432,13 @@ class MultiHeadSelfAttention(nn.Module):
         self.attention = nn.MultiheadAttention(embed_dim, num_heads, dropout)
 
         # initialize the weights
-        init_multihead_attention(self.attention)
+        init.xavier_uniform_(self.attention.in_proj_weight)
+        if self.attention.in_proj_bias is not None:
+            init.constant_(self.attention.in_proj_bias, 0)
+        init.xavier_uniform_(self.attention.out_proj.weight)
+        if self.attention.out_proj.bias is not None:
+            init.constant_(self.attention.out_proj.bias, 0)
+
 
     
     def forward(self, x : torch.Tensor) -> torch.Tensor:
