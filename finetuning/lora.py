@@ -43,6 +43,7 @@ class LoRALayerWrapper(nn.Linear):
             base_module: nn.Linear, 
             lora_rank: int, 
             frozen : bool = True,
+            debug : bool = False,
             ) -> None:
         if not isinstance(base_module, nn.Linear):
             raise ValueError(
@@ -72,6 +73,8 @@ class LoRALayerWrapper(nn.Linear):
             self.lora_A.requires_grad_(False)
             self.lora_B.requires_grad_(False)
 
+        self.debug = debug
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -84,6 +87,8 @@ class LoRALayerWrapper(nn.Linear):
             torch.Tensor: The output tensor after applying the base module and 
             adding on the LoRA perturbation.
         """
+        if self.debug: 
+            print('LoRALayerWrapper forward method called')
         # compute the output of the base module
         base_out = super().forward(x)  
 
@@ -115,6 +120,7 @@ def wrap_with_lora(
         module: nn.Module, 
         lora_rank: int, 
         frozen : bool = True,
+        debug : bool = False,
         ) -> None:
     """
     Wraps a pre-trained nn.Module with a LoRA layer. Unlike the LoraLayerWrapper
@@ -134,30 +140,11 @@ def wrap_with_lora(
     for name, child in module.named_children():
         if isinstance(child, nn.Linear):
             # Wrap the linear layer
-            wrapped = LoRALayerWrapper(child, lora_rank, frozen)
+            wrapped = LoRALayerWrapper(child, lora_rank, frozen, debug)
             setattr(module, name, wrapped)
         else:
             # Recursively replace in child modules
-            wrap_with_lora(child, lora_rank, frozen)
-
-    # lora_params = []
-    # for name, module in base_module.named_modules():
-    #     if isinstance(module, nn.Linear):
-    #         # construct the LoRA layer
-    #         lora_module = LoRALayerWrapper(module, lora_rank, device) 
-    #         # replace the module with the LoRA layer
-    #         setattr(base_module, name, lora_module)
-    #         # store the LoRA parameters
-    #         lora_params += [lora_module.lora_A, lora_module.lora_B] 
-    # # collect the LoRA parameters and set them to be untrainable
-    # lora_params = nn.ParameterList(lora_params).requires_grad_(False)
-    # if hasattr(base_module, 'lora_params'):
-    #     raise ValueError(
-    #         'The base module already has an attribute called lora_params. ' \
-    #         'Please rename this attribute if you wish to use the LoRACallback.'
-    #         )
-    # setattr(base_module, 'lora_params', nn.ParameterList(lora_params))
-    # return lora_params    
+            wrap_with_lora(child, lora_rank, frozen)   
 
 
 
@@ -168,11 +155,13 @@ class LoRACallback(BaseFinetuning):
             lora_rank : int, 
             unfreeze_epoch : int,
             pt_model : str = 'pt_model',
+            debug : bool = False,
             ) -> None:
         super().__init__()
         self.lora_rank = lora_rank
         self.unfreeze_epoch = unfreeze_epoch
         self.pt_model = pt_model
+        self.debug = debug
     
 
     def freeze_before_training(self, pl_module: pl.LightningModule) -> None:
@@ -190,6 +179,7 @@ class LoRACallback(BaseFinetuning):
                 getattr(pl_module, self.pt_model),
                 self.lora_rank, 
                 frozen=True,
+                debug=self.debug,
                 )
         else:
             raise ValueError(
