@@ -103,6 +103,8 @@ def unfreeze_lora_params(module: nn.Module, optimizer : torch.optim.Optimizer = 
     lora_params = nn.ParameterList(
         get_lora_params(module)
     )
+    for param in lora_params:
+        param.requires_grad_(True)
     if optimizer is not None:
         optimizer.add_param_group(
             {'params': lora_params, 'lr': optimizer.defaults['lr']}
