@@ -96,11 +96,14 @@ class LoRALayerWrapper(nn.Linear):
         return base_out + (x @ self.lora_A.T) @ self.lora_B.T
 
 
-def get_lora_params(module : nn.Module):
+def get_lora_params(module : nn.Module, get_names : bool = False):
     lora_params = []
-    for module in module.modules():
+    for name, module in module.named_modules():
         if isinstance(module, LoRALayerWrapper):
-            lora_params += [module.lora_A, module.lora_B]
+            if get_names:
+                lora_params += (name, module.lora_A, module.lora_B)
+            else:
+                lora_params += [module.lora_A, module.lora_B]
     return lora_params
 
 
