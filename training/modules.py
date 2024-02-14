@@ -43,7 +43,7 @@ class PipelineModule(pl.LightningModule):
         self.objectives = nn.ModuleDict(objectives) if objectives is not None else None
 
         # save the hyperparameters, excluding the objectives
-        self.save_hyperparameters(ignore=['objectives'])
+        self.save_hyperparameters(ignore=['objectives', 'model'])
 
     
     def forward(self, *args, **kwargs) -> torch.Tensor:
