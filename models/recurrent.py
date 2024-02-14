@@ -94,12 +94,14 @@ class RecurrentEncoder(BareBonesRecurrentNetwork):
             self,
             num_embeddings : int,
             embedding_dim : int,
+            num_concat_dims : int = 1,
             *args, **kwargs,
             ) -> None:
         super().__init__(in_size = embedding_dim, *args, **kwargs)
         self.embedding = IntegerEmbedding(
             num_embeddings = num_embeddings, 
             embedding_dim = embedding_dim,
+            num_concat_dims = num_concat_dims,
             )
         
 
@@ -198,6 +200,7 @@ class RecurrentEncoderDecoderWithAttention(nn.Module):
             self,
             num_embeddings : int,
             embedding_dim : int,
+            num_concat_dims : int,
             hidden_size : int, 
             out_size : int,
             num_encoder_layers : int,
@@ -216,6 +219,7 @@ class RecurrentEncoderDecoderWithAttention(nn.Module):
             hidden_size = hidden_size,
             num_layers = num_encoder_layers,
             dropout = dropout,
+            num_concat_dims = num_concat_dims,
             )
         # initialize the attention layer
         self.attention = MultiHeadSelfAttention(
