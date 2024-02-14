@@ -125,7 +125,7 @@ class netCDFDistributedPredictionWriter(DistributedPredictionWriter):
             ) -> None:
         super().__init__(*args, **kwargs)
         if not os.path.exists(path):
-            raise ValueError(f'The path {path} does not exist.')
+            os.mkdir(path)
         self.path = path
         self.variable_name = variable_name   
         self.dimension_names = dimension_names    
