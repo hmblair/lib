@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 from typing import Any, Callable, Optional
 from pytorch_lightning.utilities import rank_zero_warn
-from .hooks import HookContextManager
 
 class HookList(list):
     """
