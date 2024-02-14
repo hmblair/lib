@@ -218,7 +218,7 @@ class RecurrentEncoderDecoderWithAttention(nn.Module):
             dropout = dropout,
             )
         # initialize the attention layer
-        self.x_attention = MultiHeadSelfAttention(
+        self.attention = MultiHeadSelfAttention(
             embed_dim = hidden_size * 2,
             num_heads = num_heads,
             dropout = attention_dropout,
@@ -251,6 +251,6 @@ class RecurrentEncoderDecoderWithAttention(nn.Module):
         # pass through the encoder
         x, h = self.encoder(x)
         # pass through the attention layer
-        x = self.x_attention(x)
+        x = self.attention(x)
         # pass through the decoder
         return self.decoder(x, h)
