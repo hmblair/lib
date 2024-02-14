@@ -1,0 +1,12 @@
+# requirements.txt
+
+matplotlib
+psutil
+numpy
+scikit-learn
+torch
+pytorch-lightning
+jsonargparse[signatures]>=4.18.0
+wandb
+xarray
+h5netcdf
