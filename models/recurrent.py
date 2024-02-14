@@ -44,7 +44,6 @@ class BareBonesRecurrentNetwork(nn.Module):
         # initialize the RNN weights
         gain = nn.init.calculate_gain('tanh')
         for name, param in self.named_parameters():
-            print(name)
             if 'weight' in name and param.data.dim() == 2:
                 nn.init.xavier_uniform_(param, gain)
             elif 'bias' in name:
