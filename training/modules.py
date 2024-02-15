@@ -26,11 +26,14 @@ class PipelineModule(pl.LightningModule):
             self, 
             model : nn.Module,
             objectives : Optional[dict[str, nn.Module]] = None, 
+            name : Optional[str] = None,
             *args, **kwargs,
             ) -> None:
         super().__init__(*args, **kwargs)
-        # store the model
+        # store the model and name
         self.model = model
+        if name is not None:
+            self.name = name
 
         # create a list to store any hooks that are registered
         self.hooks = HookList()
