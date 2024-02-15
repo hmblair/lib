@@ -54,3 +54,44 @@ class LogNormalLoss(nn.Module):
             The logarithmic mean squared error between the given tensors.
         """
         return self.logmse(x, y) + self.sigma * torch.log(x)
+
+
+
+class MetricLoss(nn.Module):
+    """
+    Computes the difference between the pairwise distances of the inputs, 
+    and the pairwise distances of the targets. 
+    """
+    def __init__(self) -> None:
+        super().__init__()
+        self.mse = nn.MSELoss()
+
+    def compute_pairwise_distances(self, x : torch.Tensor) -> torch.Tensor:
+        if x.ndim == 1:
+            return (x[:, None] - x[None, :]) ** 2
+        return torch.sum(
+            (x[:, None] - x[None, :]) ** 2, 
+            dim=-1,
+            )
+
+    def forward(self, x : torch.Tensor, y : torch.Tensor) -> torch.Tensor:
+        """
+        Compute the logarithmic mean squared error between the given tensors.
+
+        Parameters:
+        ----------
+        x (torch.Tensor):
+            The data tensor.
+        y (torch.Tensor):
+            The target tensor.
+
+        Returns:
+        -------
+        torch.Tensor:
+            The logarithmic mean squared error between the given tensors.
+        """
+        # compute the pairwise distances
+        pairwise_distances_x = self.compute_pairwise_distances(x)
+        pairwise_distances_y = self.compute_pairwise_distances(torch.log(y))
+        # compute the difference between the pairwise distances
+        return self.mse(pairwise_distances_x, pairwise_distances_y)
