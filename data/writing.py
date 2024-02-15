@@ -27,6 +27,20 @@ class DistributedPredictionWriter(BasePredictionWriter, metaclass=ABCMeta):
     """ 
     def __init__(self, write_interval : str = 'batch'):
         super().__init__(write_interval)
+        self.model_name = None
+
+
+    def setup(
+            self, 
+            trainer: pl.Trainer, 
+            pl_module: pl.LightningModule,
+            stage : Optional[str] = None,
+            ) -> None:
+        """
+        Sets the model name attribute.
+        """
+        self.model_name = getattr(pl_module, 'name', pl_module.__class__.__name__)
+        return super().setup(trainer, pl_module, stage)
 
 
     @abstractmethod
@@ -125,7 +139,6 @@ class netCDFDistributedPredictionWriter(DistributedPredictionWriter):
         super().__init__(*args, **kwargs)
         if not os.path.exists(path):
             os.makedirs(path)
-        # save the path, model name, variable name, and dimension names
         self.path = path
         self.variable_name = variable_name   
         self.dimension_names = dimension_names    
@@ -145,9 +158,15 @@ class netCDFDistributedPredictionWriter(DistributedPredictionWriter):
             The model output.
         data_name (str):
             The name of the data, which is used to name the netCDF file.
-        """   
+        """
+        # get the directory to save the netCDF file to, and create it if it
+        # does not exist.
+        dir = os.path.join(self.path, self.model_name)
+        if not os.path.exists(dir):
+            os.mkdir(dir)
+        
         # get the path to the netCDF file
-        file = os.path.join(self.path, f'{data_name}.nc')
+        file = os.path.join(dir, f'{data_name}.nc')
 
         # get the dimensions of the prediction
         if self.dimension_names is not None:
