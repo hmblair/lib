@@ -79,10 +79,9 @@ class DistributedPredictionWriter(BasePredictionWriter, metaclass=ABCMeta):
             # get the data name and model name
             data_names = trainer.datamodule.data_names['predict']
             data_name = data_names[dataloader_idx]
-            model_name = pl_module.__class__.__name__
             # write the predictions to a file
             prediction = torch.cat(gathered_predictions, dim=0).cpu().numpy()
-            self.write(prediction, data_name, model_name)
+            self.write(prediction, data_name)
 
 
     def write_on_batch_end(self, *args, **kwargs) -> None:
@@ -125,7 +124,8 @@ class netCDFDistributedPredictionWriter(DistributedPredictionWriter):
             ) -> None:
         super().__init__(*args, **kwargs)
         if not os.path.exists(path):
-            os.mkdir(path)
+            os.makedirs(path)
+        # save the path, model name, variable name, and dimension names
         self.path = path
         self.variable_name = variable_name   
         self.dimension_names = dimension_names    
@@ -135,7 +135,6 @@ class netCDFDistributedPredictionWriter(DistributedPredictionWriter):
             self, 
             prediction : np.ndarray, 
             data_name : str, 
-            model_name : str,
             ) -> None:
         """
         Writes the output to a netCDF file.
@@ -146,15 +145,9 @@ class netCDFDistributedPredictionWriter(DistributedPredictionWriter):
             The model output.
         data_name (str):
             The name of the data, which is used to name the netCDF file.
-        """
-        # get the directory to save the netCDF file to, and create it if it
-        # does not exist.
-        dir = os.path.join(self.path, model_name)
-        if not os.path.exists(dir):
-            os.mkdir(dir)
-        
+        """   
         # get the path to the netCDF file
-        file = os.path.join(dir, f'{data_name}.nc')
+        file = os.path.join(self.path, f'{data_name}.nc')
 
         # get the dimensions of the prediction
         if self.dimension_names is not None:
