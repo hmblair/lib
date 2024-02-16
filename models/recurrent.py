@@ -40,6 +40,7 @@ class BareBonesRecurrentNetwork(nn.Module):
             batch_first = True,
             bidirectional = True,
             )
+        self.hidden_size = hidden_size
         
         # initialize the RNN weights
         gain = nn.init.calculate_gain('tanh')
@@ -192,6 +193,74 @@ class RecurrentDecoder(BareBonesRecurrentNetwork):
         """
         x, _ = super().forward(x, h)
         return self.linear(x)
+    
+
+
+class RecurrentClassiferDecoder(BareBonesRecurrentNetwork):
+    """
+    A simple recurrent network, followed by a linear layer applied to the
+    final hidden state.
+
+    Parameters:
+    -----------
+    hidden_size (int):
+        The hidden size.
+    dropout (float):
+        The dropout rate.
+    pooling (dict, optional):
+        The pooling layer to use. Defaults to None.
+    *args:
+        Additional positional arguments to pass to the recurrent network.
+    **kwargs:
+        Additional keyword arguments to pass to the recurrent network.
+    """
+    def __init__(
+            self, 
+            out_size : int,
+            hidden_size : int, 
+            dropout : float = 0.0,
+            *args, **kwargs,
+            ) -> None:
+        super().__init__(
+            hidden_size = hidden_size,
+            dropout = dropout,
+            *args, **kwargs,
+            )
+
+        # a linear layer to map to the output dimension
+        self.linear = DenseNetwork(
+            in_size = 2 * hidden_size,
+            out_size = out_size, 
+            dropout = dropout,
+            )
+    
+
+    def forward(
+            self, 
+            x : torch.Tensor, 
+            h : Optional[tuple[torch.Tensor, torch.Tensor]] = None,
+            ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+        """
+        Foward pass of the recurrent network.
+
+        Parameters:
+        -----------
+        x (torch.Tensor): 
+            The input tensor, of shape (batch, seq_len, in_size).
+        h (tuple[torch.Tensor, torch.Tensor], optional):
+            A tuple containing the hidden and cell states, of shape 
+            (num_layers * num_directions, batch, hidden_size). Defaults to None.
+
+        Returns:
+        --------
+        tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]: 
+            The output tensor and a tuple containing the hidden and cell states.
+        """
+        # pass through the recurrent network
+        _, (h, c) = super().forward(x, h)
+        # return the final hidden state of each direction
+        h = h[-2:].view(-1, 2 * self.hidden_size)
+        return self.linear(h)
 
 
 
@@ -235,6 +304,70 @@ class RecurrentEncoderDecoderWithAttention(nn.Module):
             num_layers = num_decoder_layers,
             dropout = dropout,
             pooling = pooling,
+            )
+    
+
+    def forward(self, x : torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the LSTM with attention.
+
+        Parameters:
+        -----------
+        x (torch.Tensor): 
+            The input tensor, of shape (batch, seq_len, in_size).
+        
+        Returns:
+        --------
+        torch.Tensor: 
+            The output tensor, of shape (batch, seq_len, out_size).
+        """
+        # pass through the encoder
+        x, h = self.encoder(x)
+        # pass through the attention layer
+        x = self.attention(x)
+        # pass through the decoder
+        return self.decoder(x, h)
+    
+
+
+class RecurrentEncoderDecoderClassifierWithAttention(nn.Module):
+    def __init__(
+            self,
+            num_embeddings : int,
+            embedding_dim : int,
+            hidden_size : int, 
+            out_size : int,
+            num_encoder_layers : int,
+            num_decoder_layers : int,
+            num_heads : int, 
+            num_concat_dims : int = 1,
+            dropout : float = 0.0,
+            attention_dropout : float = 0.0,
+            *args, **kwargs,
+            ):
+        super().__init__(*args, **kwargs)
+        # initialize the encoder
+        self.encoder = RecurrentEncoder(
+            num_embeddings = num_embeddings,
+            embedding_dim = embedding_dim,
+            hidden_size = hidden_size,
+            num_layers = num_encoder_layers,
+            dropout = dropout,
+            num_concat_dims = num_concat_dims,
+            )
+        # initialize the attention layer
+        self.attention = MultiHeadSelfAttention(
+            embed_dim = hidden_size * 2,
+            num_heads = num_heads,
+            dropout = attention_dropout,
+            )
+        # initialize the decoder
+        self.decoder = RecurrentClassiferDecoder(
+            in_size = hidden_size * 2,
+            hidden_size = hidden_size,
+            out_size = out_size,
+            num_layers = num_decoder_layers,
+            dropout = dropout,
             )
     
 
