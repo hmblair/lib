@@ -28,6 +28,7 @@ class CrossEntropy(nn.Module):
         torch.Tensor:
             The cross-entropy between the given tensors.
         """
+        print(x)
         return self.ce(x, y.long())
 
 
