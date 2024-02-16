@@ -3,6 +3,35 @@
 import torch
 import torch.nn as nn
 
+class Accuracy(nn.Module):
+    """
+    The accuracy loss function.
+    """
+    def __init__(self) -> None:
+        super().__init__()
+    
+
+    def forward(self, x : torch.Tensor, y : torch.Tensor) -> torch.Tensor:
+        """
+        Compute the accuracy between the given tensors.
+
+        Parameters:
+        ----------
+        x (torch.Tensor):
+            The data tensor, in logit form.
+        y (torch.Tensor):
+            The target tensor, containing the class labels as integers.
+
+        Returns:
+        -------
+        torch.Tensor:
+            The accuracy between most likely class labels and the target labels.
+        """
+        p = torch.argmax(x, dim=1)
+        return (p == y).float().mean()
+    
+
+
 class LogMSELoss(nn.Module):
     """
     The logarithmic mean squared error loss function.
