@@ -3,6 +3,35 @@
 import torch
 import torch.nn as nn
 
+class CrossEntropy(nn.Module):
+    """
+    The cross-entropy loss function.
+    """
+    def __init__(self) -> None:
+        super().__init__()
+        self.ce = nn.CrossEntropyLoss()
+    
+    def forward(self, x : torch.Tensor, y : torch.Tensor) -> torch.Tensor:
+        """
+        Compute the cross-entropy between the given tensors.
+
+        Parameters:
+        ----------
+        x (torch.Tensor):
+            The data tensor, in logit form.
+        y (torch.Tensor):
+            The target tensor, containing the class labels as integers. This
+            will be cast to long.
+
+        Returns:
+        -------
+        torch.Tensor:
+            The cross-entropy between the given tensors.
+        """
+        return self.ce(x, y.long())
+
+
+
 class Accuracy(nn.Module):
     """
     The accuracy loss function.
