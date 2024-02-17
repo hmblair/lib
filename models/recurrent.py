@@ -257,7 +257,7 @@ class RecurrentClassiferDecoder(BareBonesRecurrentNetwork):
         if self.d == 2:
             h = h.view(self.num_layers, 2, -1, self.hidden_size)
         # get the last hidden state of each direction
-        h = h[-1].view(-1, 2 * self.hidden_size)
+        h = h[-1].view(-1, self.d * self.hidden_size)
         # pass through the linear layer
         return self.linear(h)
 
