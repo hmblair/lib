@@ -57,8 +57,6 @@ class Accuracy(nn.Module):
             The accuracy between most likely class labels and the target labels.
         """
         p = torch.argmax(x, dim=1)
-        print(p)
-        print(y)
         return (p == y).float().mean()
     
 
