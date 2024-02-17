@@ -29,6 +29,7 @@ class CrossEntropy(nn.Module):
             The cross-entropy between the given tensors.
         """
         print(x)
+        print(y.long())
         return self.ce(x, y.long())
 
 
