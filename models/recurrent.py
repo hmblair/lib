@@ -372,6 +372,7 @@ class RecurrentEncoderDecoderClassifierWithAttention(nn.Module):
             out_size = out_size,
             num_layers = num_decoder_layers,
             dropout = dropout,
+            bidirectional = bidirectional,
             )
     
 
