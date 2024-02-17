@@ -41,6 +41,7 @@ class BareBonesRecurrentNetwork(nn.Module):
             bidirectional = True,
             )
         self.hidden_size = hidden_size
+        self.num_layers = num_layers
         
         # initialize the RNN weights
         gain = nn.init.calculate_gain('tanh')
@@ -258,8 +259,11 @@ class RecurrentClassiferDecoder(BareBonesRecurrentNetwork):
         """
         # pass through the recurrent network
         _, (h, c) = super().forward(x, h)
-        # return the final hidden state of each direction
-        h = h[-2:].view(-1, 2 * self.hidden_size)
+        # reshape h
+        h = h.view(self.num_layers, 2, -1, self.hidden_size)
+        # get the last hidden state of each direction
+        h = h[-1].view(-1, 2 * self.hidden_size)
+        # pass through the linear layer
         return self.linear(h)
 
 
