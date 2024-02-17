@@ -357,6 +357,7 @@ class RecurrentEncoderDecoderClassifierWithAttention(nn.Module):
             num_layers = num_encoder_layers,
             dropout = dropout,
             num_concat_dims = num_concat_dims,
+            bidirectional = bidirectional,
             )
         # initialize the attention layer
         self.attention = MultiHeadSelfAttention(
