@@ -21,6 +21,8 @@ class BareBonesRecurrentNetwork(nn.Module):
         The number of layers.
     dropout (float):
         The dropout rate.
+    bidirectional (bool):
+        Whether to use a bidirectional LSTM. Defaults to True.
     """
     def __init__(
             self,
@@ -28,6 +30,7 @@ class BareBonesRecurrentNetwork(nn.Module):
             hidden_size : int,
             num_layers : int,
             dropout : float = 0.0,
+            bidirectional : bool = True,
             *args, **kwargs,
             ) -> None:
         super().__init__(*args, **kwargs)
@@ -38,10 +41,13 @@ class BareBonesRecurrentNetwork(nn.Module):
             bias = True,
             dropout = dropout,
             batch_first = True,
-            bidirectional = True,
+            bidirectional = bidirectional,
             )
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.dropout = dropout
+        self.bidirectional = bidirectional
+        self.d = 2 if bidirectional else 1
         
         # initialize the RNN weights
         gain = nn.init.calculate_gain('tanh')
@@ -151,22 +157,16 @@ class RecurrentDecoder(BareBonesRecurrentNetwork):
     def __init__(
             self, 
             out_size : int,
-            hidden_size : int, 
-            dropout : float = 0.0,
             pooling : Optional[dict] = None,
             *args, **kwargs,
             ) -> None:
-        super().__init__(
-            hidden_size = hidden_size,
-            dropout = dropout,
-            *args, **kwargs,
-            )
+        super().__init__(*args, **kwargs)
 
         # a linear layer to map to the output dimension
         self.linear = DenseNetwork(
-            in_size = hidden_size * 2, 
+            in_size = self.d * self.hidden_size, 
             out_size = out_size, 
-            dropout = dropout,
+            dropout = self.dropout,
             pooling = pooling,
             )
     
@@ -218,21 +218,19 @@ class RecurrentClassiferDecoder(BareBonesRecurrentNetwork):
     def __init__(
             self, 
             out_size : int,
-            hidden_size : int, 
-            dropout : float = 0.0,
             *args, **kwargs,
             ) -> None:
         super().__init__(
-            hidden_size = hidden_size,
-            dropout = dropout,
+            hidden_size = self.hidden_size,
+            dropout = self.dropout,
             *args, **kwargs,
             )
 
         # a linear layer to map to the output dimension
         self.linear = DenseNetwork(
-            in_size = 2 * hidden_size,
+            in_size = self.d * self.hidden_size,
             out_size = out_size, 
-            dropout = dropout,
+            dropout = self.dropout,
             )
     
 
@@ -258,9 +256,10 @@ class RecurrentClassiferDecoder(BareBonesRecurrentNetwork):
             The output tensor and a tuple containing the hidden and cell states.
         """
         # pass through the recurrent network
-        _, (h, c) = super().forward(x, h)
+        _, (h, _) = super().forward(x, h)
         # reshape h
-        h = h.view(self.num_layers, 2, -1, self.hidden_size)
+        if self.d == 2:
+            h = h.view(self.num_layers, 2, -1, self.hidden_size)
         # get the last hidden state of each direction
         h = h[-1].view(-1, 2 * self.hidden_size)
         # pass through the linear layer
@@ -347,9 +346,13 @@ class RecurrentEncoderDecoderClassifierWithAttention(nn.Module):
             num_concat_dims : int = 1,
             dropout : float = 0.0,
             attention_dropout : float = 0.0,
+            bidirectional : bool = True,
             *args, **kwargs,
             ):
         super().__init__(*args, **kwargs)
+        # the number of layers depends on the number of directions
+        D = 2 if bidirectional else 1
+
         # initialize the encoder
         self.encoder = RecurrentEncoder(
             num_embeddings = num_embeddings,
@@ -361,13 +364,13 @@ class RecurrentEncoderDecoderClassifierWithAttention(nn.Module):
             )
         # initialize the attention layer
         self.attention = MultiHeadSelfAttention(
-            embed_dim = hidden_size * 2,
+            embed_dim = D * hidden_size,
             num_heads = num_heads,
             dropout = attention_dropout,
             )
         # initialize the decoder
         self.decoder = RecurrentClassiferDecoder(
-            in_size = hidden_size * 2,
+            in_size = D * hidden_size,
             hidden_size = hidden_size,
             out_size = out_size,
             num_layers = num_decoder_layers,
