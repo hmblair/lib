@@ -220,11 +220,7 @@ class RecurrentClassiferDecoder(BareBonesRecurrentNetwork):
             out_size : int,
             *args, **kwargs,
             ) -> None:
-        super().__init__(
-            hidden_size = self.hidden_size,
-            dropout = self.dropout,
-            *args, **kwargs,
-            )
+        super().__init__(*args, **kwargs)
 
         # a linear layer to map to the output dimension
         self.linear = DenseNetwork(
