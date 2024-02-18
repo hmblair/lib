@@ -393,7 +393,7 @@ class netCDFDataModule(BarebonesDataModule):
         if self.num_workers > 1:
             raise ValueError(
                 'The number of workers cannot exceed 1 for netCDF datasets.' \
-                'Exactly one is preferable.'
+                ' Exactly one is preferable.'
                 )
 
 
