@@ -23,11 +23,15 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
     num_workers (int):
         The number of workers to use for the dataloaders. If set to -1, the 
         number of workers is set to the number of available CPUs. Defaults to 1.
+    transforms (list[Callable]):
+        A list of transforms to apply to the input data before transferring the 
+        batch to the device. Defaults to an empty list.
     """
     def __init__(
             self, 
             batch_size : int, 
             num_workers : int = 1,
+            transforms : list[Callable] = [],
             ) -> None:
         super().__init__()
 
@@ -41,6 +45,9 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
 
         # save batch size
         self.batch_size = batch_size
+
+        # save the transforms
+        self.transforms = transforms
 
         # determine the number of workers from the number of available CPUs if 
         # num_workers is set to -1, otherwise use the provided value
@@ -306,10 +313,19 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         tuple[Any, Any]:
             The inputs and, if the phase is not 'predict', targets, else None.
         """
+        # get the inputs from the batch
+        inputs = self.get_inputs(batch)
+        # if the phase is 'predict', return the inputs only, and do not apply
+        # any transforms
         if self.trainer.predicting:
-            return self.get_inputs(batch), None
+            return inputs, None
+        # else, get the targets from the batch, and apply the transforms
+        # to the inputs
         else:
-            return self.get_inputs(batch), self.get_targets(batch)
+            targets = self.get_targets(batch)
+            for transform in self.transforms:
+                inputs = transform(inputs)
+            return inputs, targets
 
 
 
@@ -335,9 +351,6 @@ class netCDFDataModule(BarebonesDataModule):
         The paths to the testing data. Defaults to None.
     predict_paths (list[str], optional)):
         The paths to the prediction data. Defaults to None.
-    transforms (dict[str, Callable], optional):
-        The transforms to apply to the data. Defaults to None. This does not
-        currently do anything. 
     """
     def __init__(
             self, 
@@ -348,7 +361,6 @@ class netCDFDataModule(BarebonesDataModule):
             validate_paths : Optional[list[str]] = None,
             test_paths : Optional[list[str]] = None,
             predict_paths : Optional[list[str]] = None,
-            transforms : Optional[dict[str, Callable]] = None,
             *args, **kwargs,
             ) -> None:
         super().__init__(*args, **kwargs)
@@ -356,9 +368,6 @@ class netCDFDataModule(BarebonesDataModule):
         # store the variables
         self.input_variables = input_variables
         self.target_variables = target_variables
-
-        # store the transforms
-        self.transforms = transforms
 
         # store the stack dimension
         self.stack_dim = stack_dim
