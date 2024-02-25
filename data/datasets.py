@@ -137,7 +137,7 @@ class netCDFIterableDatasetBase(IterableDataset):
         Whether the dataset should be shuffled. Defaults to True.
     batch_dimension (str):
         The name of the batch dimension. Defaults to 'batch'.
-    transforms (list[Callable], optional):
+    transforms (list[Callable[[xr.Dataset], xr.Dataset]], optional):
         A list of transforms that will be applied to each batch. Defaults to
         an empty list.
     """
@@ -150,7 +150,7 @@ class netCDFIterableDatasetBase(IterableDataset):
             world_size : int = 1,
             should_shuffle : bool = True,
             batch_dimension : str = 'batch',
-            transforms : list[Callable] = [],
+            transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
             ) -> None:
         if not os.path.exists(path):    
             raise ValueError(f'The path "{path}" does not exist.')
