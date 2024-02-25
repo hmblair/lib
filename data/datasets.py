@@ -193,6 +193,8 @@ class netCDFIterableDatasetBase(IterableDataset):
 
         # store the transform
         self.transform = transform if transform is not None else stack_xarray
+        if not callable(self.transform):
+            raise ValueError('The transform must be callable.')
 
 
     def __len__(self) -> int:
