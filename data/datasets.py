@@ -115,6 +115,24 @@ class SimpleIterableDataset(IterableDataset):
     
 
 
+def stack_xarray(ds : xr.Dataset) -> np.ndarray:
+    """
+    Stack the variables in an xarray dataset into a numpy array.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        The dataset to stack.
+
+    Returns
+    -------
+    np.ndarray
+        The stacked dataset.
+    """
+    return np.stack([ds[name].values for name in ds.data_vars], axis=0)
+
+
+
 class netCDFIterableDatasetBase(IterableDataset):
     """
     A PyTorch iterable dataset, that allows for iterating over batches taken 
@@ -137,9 +155,9 @@ class netCDFIterableDatasetBase(IterableDataset):
         Whether the dataset should be shuffled. Defaults to True.
     batch_dimension (str):
         The name of the batch dimension. Defaults to 'batch'.
-    transforms (list[Callable[[xr.Dataset], xr.Dataset]], optional):
-        A list of transforms that will be applied to each batch. Defaults to
-        an empty list.
+    transform (Callable[[xr.Dataset], np.ndarray], optional):
+        A transform to apply to the dataset. If None, the dataset is simply
+        converted to a numpy array by stacking the variables. Defaults to None.
     """
     def __init__(
             self, 
@@ -150,7 +168,7 @@ class netCDFIterableDatasetBase(IterableDataset):
             world_size : int = 1,
             should_shuffle : bool = True,
             batch_dimension : str = 'batch',
-            transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
+            transform : Callable[[xr.Dataset], np.ndarray] = None,
             ) -> None:
         if not os.path.exists(path):    
             raise ValueError(f'The path "{path}" does not exist.')
@@ -173,8 +191,8 @@ class netCDFIterableDatasetBase(IterableDataset):
         # store whether the dataset should be shuffled
         self.should_shuffle = should_shuffle
 
-        # store the transforms
-        self.transforms = transforms
+        # store the transform
+        self.transform = transform if transform is not None else stack_xarray
 
 
     def __len__(self) -> int:
@@ -205,9 +223,7 @@ class netCDFIterableDatasetBase(IterableDataset):
         # iterate over the slices, transforming the batches as necessary
         for s in self.slices:
             batch = self.ds.isel(batch=s)
-            for transform in self.transforms:
-                batch = transform(batch)
-            yield batch
+            yield self.transform(batch)
 
 
 
@@ -224,7 +240,7 @@ class netCDFIterableDataset(IterableDataset):
             rank : int = 0,
             world_size : int = 1,
             should_shuffle : bool = True,
-            transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
+            transform : Callable[[xr.Dataset], np.ndarray] = None,
             ) -> None:
         self.data = [
             netCDFIterableDatasetBase(
@@ -234,7 +250,7 @@ class netCDFIterableDataset(IterableDataset):
                 rank = rank,
                 world_size = world_size,
                 should_shuffle = should_shuffle,
-                transforms = transforms,
+                transform = transform,
                 )
             for path in paths
             ]
