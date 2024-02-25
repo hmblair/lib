@@ -224,7 +224,7 @@ class netCDFIterableDataset(IterableDataset):
             rank : int = 0,
             world_size : int = 1,
             should_shuffle : bool = True,
-            transforms : list[Callable] = [],
+            transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
             ) -> None:
         self.data = [
             netCDFIterableDatasetBase(
