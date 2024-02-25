@@ -24,8 +24,8 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         The number of workers to use for the dataloaders. If set to -1, the 
         number of workers is set to the number of available CPUs. Defaults to 1.
     transforms (list[Callable]):
-        A list of transforms to apply to the input data before transferring the 
-        batch to the device. Defaults to an empty list.
+        A list of transforms to apply to the each batch. Defaults to an empty
+        list.
     """
     def __init__(
             self, 
@@ -313,19 +313,10 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         tuple[Any, Any]:
             The inputs and, if the phase is not 'predict', targets, else None.
         """
-        # get the inputs from the batch
-        inputs = self.get_inputs(batch)
-        # if the phase is 'predict', return the inputs only, and do not apply
-        # any transforms
         if self.trainer.predicting:
-            return inputs, None
-        # else, get the targets from the batch, and apply the transforms
-        # to the inputs
+            return self.get_inputs(batch), None
         else:
-            targets = self.get_targets(batch)
-            for transform in self.transforms:
-                inputs = transform(inputs)
-            return inputs, targets
+            return self.get_inputs(batch), self.get_targets(batch)
 
 
 
@@ -421,6 +412,7 @@ class netCDFDataModule(BarebonesDataModule):
                     rank = rank,
                     world_size = world_size,
                     should_shuffle = phase == 'train',
+                    transforms = self.transforms,
                     )
             else:
                 return [netCDFIterableDatasetBase(
@@ -430,6 +422,7 @@ class netCDFDataModule(BarebonesDataModule):
                     rank = rank,
                     world_size = world_size,
                     should_shuffle = phase == 'train',
+                    transforms = self.transforms,
                     ) for path in self.data_paths[phase]]
     
 

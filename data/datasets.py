@@ -1,7 +1,7 @@
 # datasets.py
 
 import os
-from typing import Union, Sequence, Iterable
+from typing import Union, Sequence, Iterable, Callable
 import numpy as np
 import xarray as xr
 import torch
@@ -119,7 +119,7 @@ class netCDFIterableDatasetBase(IterableDataset):
     """
     A PyTorch iterable dataset, that allows for iterating over batches taken 
     from a netCDF dataset, optionally shuffling the data. The dataset makes use
-    of XArray to interface with the netCDF dataset.
+    of Xarray to interface with the netCDF dataset.
 
     Parameters:
     ----------
@@ -137,6 +137,9 @@ class netCDFIterableDatasetBase(IterableDataset):
         Whether the dataset should be shuffled. Defaults to True.
     batch_dimension (str):
         The name of the batch dimension. Defaults to 'batch'.
+    transforms (list[Callable], optional):
+        A list of transforms that will be applied to each batch. Defaults to
+        an empty list.
     """
     def __init__(
             self, 
@@ -147,6 +150,7 @@ class netCDFIterableDatasetBase(IterableDataset):
             world_size : int = 1,
             should_shuffle : bool = True,
             batch_dimension : str = 'batch',
+            transforms : list[Callable] = [],
             ) -> None:
         if not os.path.exists(path):    
             raise ValueError(f'The path "{path}" does not exist.')
@@ -168,6 +172,9 @@ class netCDFIterableDatasetBase(IterableDataset):
 
         # store whether the dataset should be shuffled
         self.should_shuffle = should_shuffle
+
+        # store the transforms
+        self.transforms = transforms
 
 
     def __len__(self) -> int:
@@ -192,10 +199,15 @@ class netCDFIterableDatasetBase(IterableDataset):
         Iterate over the dataset in batches, shuffling the dataset along the
         batch dimension if specified.
         """
+        # shuffle the dataset if specified
         if self.should_shuffle:
             self.shuffle()    
+        # iterate over the slices, transforming the batches as necessary
         for s in self.slices:
-            yield self.ds.isel(batch=s)
+            batch = self.ds.isel(batch=s)
+            for transform in self.transforms:
+                batch = transform(batch)
+            yield batch
 
 
 
@@ -212,6 +224,7 @@ class netCDFIterableDataset(IterableDataset):
             rank : int = 0,
             world_size : int = 1,
             should_shuffle : bool = True,
+            transforms : list[Callable] = [],
             ) -> None:
         self.data = [
             netCDFIterableDatasetBase(
@@ -221,6 +234,7 @@ class netCDFIterableDataset(IterableDataset):
                 rank = rank,
                 world_size = world_size,
                 should_shuffle = should_shuffle,
+                transforms = transforms,
                 )
             for path in paths
             ]
