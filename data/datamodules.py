@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from .datasets import netCDFIterableDataset, netCDFIterableDatasetBase
 from .utils import get_filename, xarray_to_dict
+import numpy as np
+import xarray as xr
 
 class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
     """
@@ -23,15 +25,11 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
     num_workers (int):
         The number of workers to use for the dataloaders. If set to -1, the 
         number of workers is set to the number of available CPUs. Defaults to 1.
-    transforms (list[Callable]):
-        A list of transforms to apply to the each batch. Defaults to an empty
-        list.
     """
     def __init__(
             self, 
             batch_size : int, 
             num_workers : int = 1,
-            transforms : list[Callable] = [],
             ) -> None:
         super().__init__()
 
@@ -45,9 +43,6 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
 
         # save batch size
         self.batch_size = batch_size
-
-        # save the transforms
-        self.transforms = transforms
 
         # determine the number of workers from the number of available CPUs if 
         # num_workers is set to -1, otherwise use the provided value
@@ -352,6 +347,10 @@ class netCDFDataModule(BarebonesDataModule):
             validate_paths : Optional[list[str]] = None,
             test_paths : Optional[list[str]] = None,
             predict_paths : Optional[list[str]] = None,
+            train_transforms : list[Callable[[xr.Dataset], np.ndarray]] = None,
+            validate_transforms : list[Callable[[xr.Dataset], np.ndarray]] = None,
+            test_transforms : list[Callable[[xr.Dataset], np.ndarray]] = None,
+            predict_transforms : list[Callable[[xr.Dataset], np.ndarray]] = None,
             *args, **kwargs,
             ) -> None:
         super().__init__(*args, **kwargs)
@@ -378,6 +377,14 @@ class netCDFDataModule(BarebonesDataModule):
             'validate': get_data_names(validate_paths),
             'test': get_data_names(test_paths),
             'predict': get_data_names(predict_paths),
+            }
+        
+        # store the transform
+        self.transforms = {
+            'train': train_transforms,
+            'validate': validate_transforms,
+            'test': test_transforms,
+            'predict': predict_transforms,
             }
 
         # raise an error if the number of workers is greater than 1
@@ -407,22 +414,20 @@ class netCDFDataModule(BarebonesDataModule):
             if phase == 'train':
                 return netCDFIterableDataset(
                     paths = self.data_paths[phase],
-                    variables = self.input_variables + self.target_variables if phase != 'predict' else self.input_variables,
                     batch_size = self.batch_size,
                     rank = rank,
                     world_size = world_size,
                     should_shuffle = phase == 'train',
-                    transforms = self.transforms,
+                    transform = self.transforms[phase]
                     )
             else:
                 return [netCDFIterableDatasetBase(
                     path = path,
-                    variables = self.input_variables + self.target_variables if phase != 'predict' else self.input_variables,
                     batch_size = self.batch_size,
                     rank = rank,
                     world_size = world_size,
                     should_shuffle = phase == 'train',
-                    transforms = self.transforms,
+                    transform = self.transforms[phase]
                     ) for path in self.data_paths[phase]]
     
 

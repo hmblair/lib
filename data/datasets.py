@@ -162,7 +162,6 @@ class netCDFIterableDatasetBase(IterableDataset):
     def __init__(
             self, 
             path : str,
-            variables : list[str],
             batch_size : int, 
             rank : int = 0,
             world_size : int = 1,
@@ -172,7 +171,7 @@ class netCDFIterableDatasetBase(IterableDataset):
             ) -> None:
         if not os.path.exists(path):    
             raise ValueError(f'The path "{path}" does not exist.')
-        self.ds = xr.open_dataset(path, engine='h5netcdf')[variables]
+        self.ds = xr.open_dataset(path, engine='h5netcdf')
         if not batch_dimension in self.ds.dims:
             raise ValueError(
                 f'The specified batch dimension "{batch_dimension}" does not exist in the dataset.'
@@ -237,7 +236,6 @@ class netCDFIterableDataset(IterableDataset):
     def __init__(
             self, 
             paths : list[str], 
-            variables : list[str],
             batch_size : int,
             rank : int = 0,
             world_size : int = 1,
@@ -247,7 +245,6 @@ class netCDFIterableDataset(IterableDataset):
         self.data = [
             netCDFIterableDatasetBase(
                 path = path,
-                variables = variables,
                 batch_size = batch_size,
                 rank = rank,
                 world_size = world_size,
