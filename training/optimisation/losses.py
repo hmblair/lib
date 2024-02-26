@@ -3,6 +3,70 @@
 import torch
 import torch.nn as nn
 
+class CosineSimilarity(nn.Module):
+    """
+    Compute the cosine similarity between the given tensors.
+    """
+    def __init__(self) -> None:
+        super().__init__()
+    
+
+    def forward(self, x : torch.Tensor, y : torch.Tensor) -> torch.Tensor:
+        """
+        Compute the cosine similarity between the given tensors.
+
+        Parameters:
+        ----------
+        x (torch.Tensor):
+            The data tensor.
+        y (torch.Tensor):
+            The target tensor.
+
+        Returns:
+        -------
+        torch.Tensor:
+            The cosine similarity between the given tensors.
+        """
+        return 1 - (x * y).sum() / (x.norm() * y.norm())
+    
+
+
+class MahalanobisDistance(nn.Module):
+    """
+    Compute the squared Mahalanobis distance between the given tensors.
+    """
+    def __init__(self) -> None:
+        super().__init__()
+    
+
+    def forward(
+            self, 
+            x : torch.Tensor, 
+            y : torch.Tensor, 
+            prec : torch.Tensor,
+            ) -> torch.Tensor:
+        """
+        Compute the squared Mahalanobis distance between the given tensors.
+
+        Parameters:
+        ----------
+        x (torch.Tensor):
+            The data tensor.
+        y (torch.Tensor):
+            The target tensor.
+        prec (torch.Tensor):
+            The precision matrix.
+
+        Returns:
+        -------
+        torch.Tensor:
+            The Mahalanobis distance between the given tensors.
+        """
+        diff = x - y
+        return diff @ prec @ diff
+
+
+
 class CrossEntropy(nn.Module):
     """
     The cross-entropy loss function.
@@ -153,3 +217,48 @@ class MetricLoss(nn.Module):
         pairwise_distances_y = self.compute_pairwise_distances(torch.log(y))
         # compute the difference between the pairwise distances
         return self.mse(pairwise_distances_x, pairwise_distances_y)
+    
+
+class ContrastiveEmbeddingLoss(nn.Module):
+    """
+    Apply a hinge loss to the pairwise distances between the embeddings.
+
+    Parameters:
+    ----------
+    margin : float
+        The margin for the hinge loss. Defaults to 1.
+    """
+    def __init__(self, margin : float = 1) -> None:
+        super().__init__()
+        self.margin = margin
+
+    def forward(self, x : torch.Tensor, y : torch.Tensor) -> torch.Tensor:
+        """
+        Compute the contrastive loss between the given tensors.
+
+        Parameters:
+        ----------
+        x (torch.Tensor):
+            The data tensor, containing the predicted embeddings.
+        y (torch.Tensor):
+            The target tensor, containing the class labels as integers.
+
+
+        Returns:
+        -------
+        torch.Tensor:
+            The contrastive loss between the given tensors.
+        """
+        # compute the pairwise distances between the embeddings
+        pairwise_distances = torch.sum(
+            (x[:, None] - x[None, :]) ** 2, dim=-1
+            )
+        
+        # compute whether the embeddings are from the same class
+        y = (y[:, None] == y[None, :]).float()
+
+        # compute the contrastive loss using a hinge loss
+        return torch.mean(
+            (1 - y) * pairwise_distances + 
+            y * torch.clamp(self.margin - pairwise_distances, min=0)
+            )
