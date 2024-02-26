@@ -257,7 +257,7 @@ class ContrastiveEmbeddingLoss(nn.Module):
         # compute whether the embeddings are from the same class
         y = (y[:, None] == y[None, :]).float()
 
-        print(y)
+        print(torch.sum(y))
 
         # compute the contrastive loss using a hinge loss
         return torch.mean(
