@@ -271,7 +271,9 @@ class ContrastiveEmbeddingLoss(nn.Module):
         """
         # compute the pairwise distances between the embeddings
         pairwise_distances = self.metric(x[None, :], x[:, None])
-        
+
+        print(pairwise_distances)
+
         # compute whether the embeddings are from the same class
         y = (y[:, None] == y[None, :]).float()
 
