@@ -241,7 +241,7 @@ class ContrastiveEmbeddingLoss(nn.Module):
         # the allowable metrics
         metrics = {
             'euclidean' : lambda x, y : torch.sum((x - y) ** 2, dim=-1),
-            'cosine' : lambda x, y : 1 - (x * y).sum() / (x.norm() * y.norm()),
+            'cosine' : lambda x, y : 1 - torch.sum(x * y, dim = -1) / (x.norm(dim=-1) * y.norm(dim=-1)),
             'mahalanobis' : lambda x, y, prec : (x - y) @ prec @ (x - y),
         }
 
