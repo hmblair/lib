@@ -347,10 +347,10 @@ class netCDFDataModule(BarebonesDataModule):
             validate_paths : Optional[list[str]] = None,
             test_paths : Optional[list[str]] = None,
             predict_paths : Optional[list[str]] = None,
-            train_transforms : list[Callable[[xr.Dataset], np.ndarray]] = None,
-            validate_transforms : list[Callable[[xr.Dataset], np.ndarray]] = None,
-            test_transforms : list[Callable[[xr.Dataset], np.ndarray]] = None,
-            predict_transforms : list[Callable[[xr.Dataset], np.ndarray]] = None,
+            train_transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
+            validate_transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
+            test_transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
+            predict_transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
             *args, **kwargs,
             ) -> None:
         super().__init__(*args, **kwargs)
@@ -418,7 +418,7 @@ class netCDFDataModule(BarebonesDataModule):
                     rank = rank,
                     world_size = world_size,
                     should_shuffle = phase == 'train',
-                    transform = self.transforms[phase]
+                    transforms = self.transforms[phase]
                     )
             else:
                 return [netCDFIterableDatasetBase(
@@ -427,7 +427,7 @@ class netCDFDataModule(BarebonesDataModule):
                     rank = rank,
                     world_size = world_size,
                     should_shuffle = phase == 'train',
-                    transform = self.transforms[phase]
+                    transforms = self.transforms[phase]
                     ) for path in self.data_paths[phase]]
     
 

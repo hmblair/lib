@@ -155,9 +155,8 @@ class netCDFIterableDatasetBase(IterableDataset):
         Whether the dataset should be shuffled. Defaults to True.
     batch_dimension (str):
         The name of the batch dimension. Defaults to 'batch'.
-    transform (Callable[[xr.Dataset], np.ndarray], optional):
-        A transform to apply to the dataset. If None, the dataset is simply
-        converted to a numpy array by stacking the variables. Defaults to None.
+    transforms (list[Callable[[xr.Dataset], xr.Dataset]], optional):
+        A list of transforms to apply to the dataset. Defaults to an empty list.
     """
     def __init__(
             self, 
@@ -167,7 +166,7 @@ class netCDFIterableDatasetBase(IterableDataset):
             world_size : int = 1,
             should_shuffle : bool = True,
             batch_dimension : str = 'batch',
-            transform : Callable[[xr.Dataset], np.ndarray] = None,
+            transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
             ) -> None:
         if not os.path.exists(path):    
             raise ValueError(f'The path "{path}" does not exist.')
@@ -190,10 +189,8 @@ class netCDFIterableDatasetBase(IterableDataset):
         # store whether the dataset should be shuffled
         self.should_shuffle = should_shuffle
 
-        # store the transform
-        self.transform = transform if transform is not None else stack_xarray
-        if not callable(self.transform):
-            raise ValueError('The transform must be callable.')
+        # store the transforms
+        self.transforms = transforms
 
 
     def __len__(self) -> int:
@@ -224,7 +221,9 @@ class netCDFIterableDatasetBase(IterableDataset):
         # iterate over the slices, transforming the batches as necessary
         for s in self.slices:
             batch = self.ds.isel(batch=s)
-            yield self.transform(batch)
+            for transform in self.transforms:
+                batch = transform(batch)
+            yield batch
 
 
 
@@ -240,7 +239,7 @@ class netCDFIterableDataset(IterableDataset):
             rank : int = 0,
             world_size : int = 1,
             should_shuffle : bool = True,
-            transform : Callable[[xr.Dataset], np.ndarray] = None,
+            transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
             ) -> None:
         self.data = [
             netCDFIterableDatasetBase(
@@ -249,7 +248,7 @@ class netCDFIterableDataset(IterableDataset):
                 rank = rank,
                 world_size = world_size,
                 should_shuffle = should_shuffle,
-                transform = transform,
+                transforms = transforms,
                 )
             for path in paths
             ]
