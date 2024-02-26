@@ -217,7 +217,8 @@ class MetricLoss(nn.Module):
         pairwise_distances_y = self.compute_pairwise_distances(torch.log(y))
         # compute the difference between the pairwise distances
         return self.mse(pairwise_distances_x, pairwise_distances_y)
-    
+
+
 
 class ContrastiveEmbeddingLoss(nn.Module):
     """
@@ -227,10 +228,29 @@ class ContrastiveEmbeddingLoss(nn.Module):
     ----------
     margin : float
         The margin for the hinge loss. Defaults to 1.
+    metric : str
+        The metric to use for computing the pairwise distances. Defaults to
+        'euclidean'. Must be one of 'euclidean', 'cosine', 'mahalanobis'.
     """
-    def __init__(self, margin : float = 1) -> None:
+    def __init__(self, margin : float = 1, metric : str = 'euclidean') -> None:
         super().__init__()
+
+        # store the margin
         self.margin = margin
+
+        # the allowable metrics
+        metrics = {
+            'euclidean' : lambda x, y : torch.sum((x - y) ** 2, dim=-1),
+            'cosine' : lambda x, y : 1 - (x * y).sum() / (x.norm() * y.norm()),
+            'mahalanobis' : lambda x, y, prec : (x - y) @ prec @ (x - y),
+        }
+
+        if metric not in metrics:
+            raise ValueError(f'The metric must be one of {list(metrics.keys())}.')
+        
+        # store the metric
+        self.metric = metrics[metric]
+
 
     def forward(self, x : torch.Tensor, y : torch.Tensor) -> torch.Tensor:
         """
@@ -250,9 +270,7 @@ class ContrastiveEmbeddingLoss(nn.Module):
             The contrastive loss between the given tensors.
         """
         # compute the pairwise distances between the embeddings
-        pairwise_distances = torch.sum(
-            (x[:, None] - x[None, :]) ** 2, dim=-1
-            )
+        pairwise_distances = self.metric(x[None, :], x[:, None])
         
         # compute whether the embeddings are from the same class
         y = (y[:, None] == y[None, :]).float()
