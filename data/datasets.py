@@ -115,9 +115,10 @@ class SimpleIterableDataset(IterableDataset):
     
 
 
-def stack_xarray(ds : xr.Dataset) -> np.ndarray:
+def stack_xarray(ds : xr.Dataset, variables : list[str]) -> np.ndarray | None:
     """
-    Stack the variables in an xarray dataset into a numpy array.
+    Stack the variables in an xarray dataset into a numpy array. If the list of
+    variables is empty, return None.
 
     Parameters
     ----------
@@ -126,10 +127,12 @@ def stack_xarray(ds : xr.Dataset) -> np.ndarray:
 
     Returns
     -------
-    np.ndarray
-        The stacked dataset.
+    np.ndarray | None
+        The stacked dataset, or None if the list of variables is empty.
     """
-    return np.stack([ds[name].values for name in ds.data_vars], axis=0)
+    if not variables:
+        return None
+    return np.stack([ds[name].values for name in variables], axis=0)
 
 
 
@@ -143,10 +146,12 @@ class netCDFIterableDatasetBase(IterableDataset):
     ----------
     path (str):
         The path to the netCDF dataset.
-    variables (list[str]):
-        The variables to load from the netCDF dataset.
     batch_size (int):
         The batch size.
+    input_variables (list[str]):
+        The names of the input variables.
+    target_variables (list[str], optional):
+        The names of the target variables. Defaults to None.
     rank (int):
         The rank of the current device. Defaults to 0.
     world_size (int):
@@ -162,15 +167,21 @@ class netCDFIterableDatasetBase(IterableDataset):
             self, 
             path : str,
             batch_size : int, 
+            input_variables : list[str],
+            target_variables : list[str] = [],
             rank : int = 0,
             world_size : int = 1,
             should_shuffle : bool = True,
             batch_dimension : str = 'batch',
             transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
             ) -> None:
+        # verify that the path exists, and open the dataset
         if not os.path.exists(path):    
             raise ValueError(f'The path "{path}" does not exist.')
         self.ds = xr.open_dataset(path, engine='h5netcdf')
+
+        # verify that the batch dimension exists in the dataset, and store the
+        # number of datapoints and the batch dimension
         if not batch_dimension in self.ds.dims:
             raise ValueError(
                 f'The specified batch dimension "{batch_dimension}" does not exist in the dataset.'
@@ -185,6 +196,18 @@ class netCDFIterableDatasetBase(IterableDataset):
             world_size=world_size,
             rank=rank,
             )
+        
+        # verify that the input and target variables exist in the dataset, and
+        # store the input and target variables
+        for variable in input_variables + target_variables:
+            if not variable in self.ds.data_vars:
+                raise ValueError(
+                    f'The variable "{variable}" does not exist in the dataset.'
+                    )
+        if not input_variables:
+            raise ValueError('At least one input variable must be specified.')
+        self.input_variables = input_variables
+        self.target_variables = target_variables
 
         # store whether the dataset should be shuffled
         self.should_shuffle = should_shuffle
@@ -210,20 +233,22 @@ class netCDFIterableDatasetBase(IterableDataset):
         self.ds = self.ds.isel(batch=ix)
     
 
-    def __iter__(self) -> Iterable:
+    def __iter__(self) -> Iterable[tuple[np.ndarray, np.ndarray]]:
         """
         Iterate over the dataset in batches, shuffling the dataset along the
-        batch dimension if specified.
+        batch dimension if specified. The input and target variables of each 
+        batch are stacked into numpy arrays and yielded.
         """
         # shuffle the dataset if specified
         if self.should_shuffle:
             self.shuffle()    
-        # iterate over the slices, transforming the batches as necessary
+        # iterate over the slices, transforming the batches as necessary, and
+        # yielding the slice at the input and target variables
         for s in self.slices:
             batch = self.ds.isel(batch=s)
             for transform in self.transforms:
                 batch = transform(batch)
-            yield batch
+            yield stack_xarray(batch, self.input_variables), stack_xarray(batch, self.target_variables)
 
 
 
@@ -236,15 +261,20 @@ class netCDFIterableDataset(IterableDataset):
             self, 
             paths : list[str], 
             batch_size : int,
+            input_variables : list[str],
+            target_variables : list[str],
             rank : int = 0,
             world_size : int = 1,
             should_shuffle : bool = True,
             transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
             ) -> None:
+        # initialize the datasets
         self.data = [
             netCDFIterableDatasetBase(
                 path = path,
                 batch_size = batch_size,
+                input_variables = input_variables,
+                target_variables = target_variables,
                 rank = rank,
                 world_size = world_size,
                 should_shuffle = should_shuffle,
@@ -254,14 +284,14 @@ class netCDFIterableDataset(IterableDataset):
             ]
     
 
-    def __iter__(self) -> Iterable:
+    def __iter__(self) -> Iterable[tuple[np.ndarray, np.ndarray]]:
         """
         Iterate over the dataset in batches, shuffling the dataset along the
         batch dimension if specified.
         """
         while True:
-            for d in self.data:
-                for batch in d:
+            for datum in self.data:
+                for batch in datum:
                     yield batch
 
     

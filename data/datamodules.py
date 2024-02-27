@@ -81,12 +81,12 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
 
 
     @abstractmethod
-    def _create_datasets(
+    def create_datasets(
         self, 
         phase : str, 
         rank : int, 
         world_size : int,
-        ) -> Union[Sequence, Iterable]:
+        ) -> Sequence | Iterable:
         """
         Create a dataset for the specified phase. An abstract method that must
         be implemented by a subclass.
@@ -109,7 +109,7 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         return   
     
 
-    def _create_dataloaders(self, phase: str) -> DataLoader:
+    def create_dataloaders(self, phase: str) -> DataLoader:
         """
         Create a dataloader for the specified phase. Overwrite this method if 
         you want to use a custom dataloader construction, such as if batching
@@ -170,14 +170,14 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         rank, world_size = self.distributed_info()
 
         if stage == 'fit':
-            self.data['train'] = self._create_datasets(
+            self.data['train'] = self.create_datasets(
                 'train', rank, world_size,
                 )
-            self.data['validate'] = self._create_datasets(
+            self.data['validate'] = self.create_datasets(
                 'validate', rank, world_size,
                 )
         elif stage in ['test', 'validate', 'predict']:
-            self.data[stage] = self._create_datasets(
+            self.data[stage] = self.create_datasets(
                 stage, rank, world_size,
                 )
         else:
@@ -195,7 +195,7 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         torch.utils.data.DataLoader: 
             The train dataloader.
         """
-        return self._create_dataloaders('train')
+        return self.create_dataloaders('train')
 
 
     def val_dataloader(self) -> DataLoader:
@@ -211,7 +211,7 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
         if self.data['validate'] is None:
             return super().val_dataloader()
         else:
-            return self._create_dataloaders('validate')
+            return self.create_dataloaders('validate')
 
 
     def test_dataloader(self) -> DataLoader:
@@ -227,7 +227,7 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
             raise ValueError(
                 'No test dataset found. Please ensure there is a test dataset when initialising the data module.'
                 )
-        return self._create_dataloaders('test')
+        return self.create_dataloaders('test')
 
 
     def predict_dataloader(self) -> DataLoader:
@@ -243,75 +243,8 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
             raise ValueError(
                 'No prediction dataset found. Please ensure there is a prediction dataset when initialising the data module.'
                 )
-        return self._create_dataloaders('predict')
+        return self.create_dataloaders('predict')
 
-
-    @abstractmethod
-    def get_inputs(self, batch : Any) -> torch.Tensor:
-        """
-        Extracts the inputs from the batch. This is useful as the batch may be
-        of varying types, such as a tuple or a dictionary, and so this method
-        allows you to provide an interface for the model to retrieve the inputs.
-
-        Parameters:
-        ----------
-        batch (Any): 
-            The batch to extract the inputs from.
-
-        Returns:
-        -------
-        torch.Tensor: 
-            The inputs.
-        """
-        return
-    
-
-    @abstractmethod
-    def get_targets(self, batch : Any) -> torch.Tensor:
-        """
-        Extracts the targets from the batch. This is useful as the batch may be
-        of varying types, such as a tuple or a dictionary, and so this method
-        allows you to provide an interface for the model to retrieve the targets.
-
-        Parameters:
-        ----------
-        batch (Any): 
-            The batch to extract the targets from.
-
-        Returns:
-        -------
-        torch.Tensor: 
-            The targets.
-        """
-        return
-    
-
-    def on_before_batch_transfer(
-            self, 
-            batch: Any, 
-            dataloader_idx: int,
-            ) -> tuple[Any, Any]:
-        """
-        Called before a batch is transferred to the device. This method extracts
-        the inputs and, if the phase not 'predict', the targets from the batch.
-        In the latter case, the targets are returned as None.
-
-        Parameters:
-        ----------
-        batch (Any): 
-            The batch to extract the inputs and targets from.
-        dataloader_idx (int):
-            The index of the dataloader.
-
-        Returns:
-        -------
-        tuple[Any, Any]:
-            The inputs and, if the phase is not 'predict', targets, else None.
-        """
-        if self.trainer.predicting:
-            return self.get_inputs(batch), None
-        else:
-            return self.get_inputs(batch), self.get_targets(batch)
 
 
 
@@ -395,26 +328,28 @@ class netCDFDataModule(BarebonesDataModule):
                 )
 
 
-    def _create_datasets(
+    def create_datasets(
             self, 
             phase: str, 
             rank: int, 
             world_size: int,
-            ) -> Union[Sequence, Iterable]:
+            ) -> Iterable:
         """
         Create a dataset for the specified phase, if a path to the data is
         specified.
         """
         if self.data_paths[phase] is not None:
-            if phase == 'train' and not self.target_variables:
+            if phase != 'predict' and not self.target_variables:
                 raise ValueError(
-                    'The target variables must be specified if the phase is "train".'
+                    'The target variables must be specified if the phase is not "predict".'
                     )
             
             if phase == 'train':
                 return netCDFIterableDataset(
                     paths = self.data_paths[phase],
                     batch_size = self.batch_size,
+                    input_variables = self.input_variables,
+                    target_variables = self.target_variables,
                     rank = rank,
                     world_size = world_size,
                     should_shuffle = phase == 'train',
@@ -424,6 +359,8 @@ class netCDFDataModule(BarebonesDataModule):
                 return [netCDFIterableDatasetBase(
                     path = path,
                     batch_size = self.batch_size,
+                    input_variables = self.input_variables,
+                    target_variables = self.target_variables,
                     rank = rank,
                     world_size = world_size,
                     should_shuffle = phase == 'train',
@@ -431,7 +368,7 @@ class netCDFDataModule(BarebonesDataModule):
                     ) for path in self.data_paths[phase]]
     
 
-    def _create_dataloaders(self, phase: str) -> DataLoader:
+    def create_dataloaders(self, phase: str) -> DataLoader:
         """
         Create a dataloader for the specified phase.
 
@@ -468,43 +405,3 @@ class netCDFDataModule(BarebonesDataModule):
                     collate_fn = xarray_to_dict,
                     multiprocessing_context = 'fork' if torch.backends.mps.is_available() and self.num_workers > 0 else None,
                 ) for data in self.data[phase]]
-    
-    
-    def get_inputs(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        """
-        Get the inputs from the batch.
-
-        Parameters:
-        ----------
-        batch (dict[str, torch.Tensor]): 
-            The batch of data.
-
-        Returns:
-        -------
-        torch.Tensor:
-            The inputs from the batch.
-        """
-        return torch.stack(
-            [batch[name] for name in self.input_variables], 
-            dim = self.stack_dim
-            ).squeeze(-1)
-
-    
-    def get_targets(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
-        """
-        Get the targets from the batch.
-
-        Parameters:
-        ----------
-        batch (dict[str, torch.Tensor]): 
-            The batch of data.
-
-        Returns:
-        -------
-        torch.Tensor:
-            The targets from the batch.
-        """
-        return torch.stack(
-            [batch[name] for name in self.target_variables], 
-            dim = self.stack_dim
-            ).squeeze(-1) if self.target_variables is not None else None
