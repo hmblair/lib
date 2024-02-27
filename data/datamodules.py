@@ -394,7 +394,6 @@ class netCDFDataModule(BarebonesDataModule):
                     dataset = self.data[phase],
                     num_workers = self.num_workers,
                     batch_size = (None if self.num_workers <= 1 else self.num_workers),
-                    collate_fn = xarray_to_dict,
                     multiprocessing_context = 'fork' if torch.backends.mps.is_available() and self.num_workers > 0 else None,
                     )
             else:
@@ -402,6 +401,5 @@ class netCDFDataModule(BarebonesDataModule):
                     dataset = data,
                     num_workers = self.num_workers,
                     batch_size = (None if self.num_workers <= 1 else self.num_workers),
-                    collate_fn = xarray_to_dict,
                     multiprocessing_context = 'fork' if torch.backends.mps.is_available() and self.num_workers > 0 else None,
                 ) for data in self.data[phase]]
