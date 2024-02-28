@@ -247,6 +247,30 @@ class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
 
 
 
+def recursively_find_files(dir : str, extension : str) -> list[str]:
+    """
+    Recursively find all files with a given extension in a directory.
+
+    Parameters:
+    -----------
+    dir (str):
+        The directory to search.
+    extension (str):
+        The file extension to search for.
+
+    Returns:
+    --------
+    list[str]:
+        A list of file paths.
+    """
+    files = []
+    for root, _, filenames in os.walk(dir):
+        for filename in filenames:
+            if filename.endswith(extension):
+                files.append(os.path.join(root, filename))
+    return files
+
+
 
 class netCDFDataModule(BarebonesDataModule):
     """
@@ -263,7 +287,9 @@ class netCDFDataModule(BarebonesDataModule):
         The dimension to stack the input and target variables along. Defaults
         to -1.
     train_paths (list[str], optional):
-        The paths to the training data. Defaults to None.
+        The paths to the training data. Defaults to None. If a path points to a
+        directory, all files with the extension '.nc' in the directory are
+        loaded.
     validate_paths (list[str], optional):
         The paths to the validation data. Defaults to None.
     test_paths (list[str], optional)):
@@ -294,6 +320,18 @@ class netCDFDataModule(BarebonesDataModule):
 
         # store the stack dimension
         self.stack_dim = stack_dim
+
+        # recursively find files in the specified directories
+        for paths in [train_paths, validate_paths, test_paths, predict_paths]:
+            for path in paths:
+                if os.path.isdir(path):
+                    paths.extend(
+                        recursively_find_files(path, '.nc')
+                        )
+                    paths.remove(path)
+
+            # remove any duplicate paths
+            paths = list(set(paths))
 
         # store the paths to each dataset
         self.data_paths = {
