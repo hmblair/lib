@@ -323,6 +323,8 @@ class netCDFDataModule(BarebonesDataModule):
 
         # recursively find files in the specified directories
         for paths in [train_paths, validate_paths, test_paths, predict_paths]:
+            if paths is None:
+                continue
             for path in paths:
                 if os.path.isdir(path):
                     paths.extend(
