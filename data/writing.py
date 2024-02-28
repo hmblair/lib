@@ -184,7 +184,7 @@ class netCDFDistributedPredictionWriter(DistributedPredictionWriter):
                 {self.variable_name : (dims, prediction)}
                 )      
         else:
-            dataset = xr.load_dataset(file, mode='a')            
+            dataset = xr.load_dataset(file, engine='h5netcdf')            
             dataset_to_append = xr.Dataset(
                 {self.variable_name : (dims, prediction)}
                 )
