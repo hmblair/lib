@@ -237,7 +237,8 @@ class netCDFIterableDatasetBase(IterableDataset):
         """
         Iterate over the dataset in batches, shuffling the dataset along the
         batch dimension if specified. The input and target variables of each 
-        batch are stacked into numpy arrays and yielded.
+        batch are stacked into numpy arrays and yielded. If the list of target
+        variables is empty, the targets are set to None.
         """
         # shuffle the dataset if specified
         if self.should_shuffle:
@@ -268,6 +269,10 @@ class netCDFIterableDataset(IterableDataset):
             should_shuffle : bool = True,
             transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
             ) -> None:
+        # verify that at least one path is specified
+        if not paths:
+            raise ValueError('At least one path must be specified.')
+        
         # initialize the datasets
         self.data = [
             netCDFIterableDatasetBase(
