@@ -380,3 +380,234 @@ class FinetuningModuleDenseHead(PipelineModule):
         return self.head(
             super().forward(x)
             )
+    
+
+
+class DenoisingDiffusionModule(pl.LightningModule):
+    """
+    Implements a denoising diffusion model, which is trained to predict the
+    noise added to the input data during the forward diffusion process. The 
+    forward method of this class samples from the distribution of the diffusion
+    model, by repeatedly applying the reverse diffusion process.
+
+    Parameters:
+    ----------
+    model (nn.Module):
+        The model to be used as an approximate posterior for the noise. This 
+        should map inputs to outputs of the same shape.
+    beta (torch.Tensor[float]):
+        The betas for the diffusion process. The length of this tensor
+        determines the number of steps in the forward diffusion process.
+    """
+    def __init__(
+            self, 
+            model : nn.Module,
+            beta : torch.Tensor[float],
+            *args, **kwargs,
+            ) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.model = model
+        self.objective = nn.MSELoss()
+
+        self.betas = beta
+        self.alpha = 1 - beta
+        self.alpha_bar = torch.cumprod(self.alpha, 0)
+
+    
+    def forward_diffusion(self, x : torch.Tensor, t : int) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Applies t steps of the forward diffusion process to the input tensor x 
+        using the closed-form solution. 
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor to be diffused. 
+        t : int
+            The number of forward diffusion steps to apply.
+        
+        Returns
+        -------
+        torch.Tensor
+            The noise which was added to the input tensor, of the same shape as x.
+        torch.Tensor
+            The diffused tensor, of the same shape as x.
+        """
+        # sample standard normal noise
+        z = torch.randn_like(x)
+
+        # apply the reverse diffusion process, and return the result along with
+        # the noise that was added
+        return z, x * torch.sqrt(self.alpha_bar[t]) + z * torch.sqrt(1 - self.alpha_bar[t])
+    
+
+    def reverse_diffusion(self, x : torch.Tensor, t : int) -> torch.Tensor:
+        """
+        Applies a single step of the reverse diffusion process to the input 
+        tensor x, using self.model as an approximate posterior for the noise.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor to be denoised.
+        add_noise : bool, optional
+            Whether to add standard normal noise to the denoised tensor. 
+            Defaults to True.
+
+        Returns
+        -------
+        torch.Tensor
+            The tensor after a single step of the reverse diffusion process.
+        """
+
+        # sample standard normal noise at all steps except the final step
+        # (which is the first step of the forward diffusion process)
+        z = 0 if t == 0 else torch.randn_like(x)
+
+        # apply the reverse diffusion process
+        return 1 / torch.sqrt(self.alpha[t]) * (
+            (x - (1 - self.alpha[t]) / torch.sqrt(1 - self.alpha_bar[t]) * self(x, t)) \
+                + torch.sqrt(1 - self.alpha[t]) * z
+        )
+    
+
+    def forward(self, shape : torch.Size) -> torch.Tensor:
+        """
+        Samples from the distribution of the diffusion model, by repeatedly
+        applying the reverse diffusion process. 
+
+        Parameters
+        ----------
+        shape : torch.Size
+            The shape of the tensor to be sampled.
+
+        Returns
+        -------
+        torch.Tensor
+            A sample from the diffusion model, of the specified shape.
+        """
+
+        # initialise the sample by sampling standard normal noise
+        x = torch.randn(shape)
+
+        for t in range(len(self.betas) - 1, -1, -1):
+            # apply the reverse diffusion process, with no noise at the final 
+            # step (which is the first step of the forward diffusion process)
+            x = self.reverse_diffusion(x, t)
+
+        return x
+    
+
+    def loss_step(
+            self, 
+            batch : torch.Tensor, 
+            phase : str,
+            ) -> torch.Tensor:
+        """
+        Sample a random timestep, and apply the forward and reverse diffusion
+        processes to the input batch of data. Given that the model is trying to
+        predict the noise added to the model, the output of this process is 
+        copmared to the original noise that was used in the forward diffusion
+        process.
+        
+        Parameters
+        ----------
+        batch : torch.Tensor
+            The input batch of data, which will be noised and denoised.
+        batch_ix : list[int]
+            The index of the current batch.
+        dataloader_idx : int
+            The index of the current dataloader. Defaults to 0, which will be
+            the case if there is only one dataloader.
+
+        Returns
+        -------
+        torch.Tensor
+            The loss value for the training step.
+        """
+        # sample a random timestep
+        t = torch.randint(0, self.betas, (1,))
+
+        # apply the forward diffusion process
+        z, x = self.forward_diffusion(batch, t)
+
+        # apply the reverse diffusion process
+        z_hat = self.reverse_diffusion(x, t)
+
+        # compute the loss
+        loss = self.objective(z_hat, z)
+
+        # log the loss
+        self.log(phase + '_loss', loss, on_step=True, on_epoch=True)
+
+    
+    def training_step(
+            self, 
+            batch : torch.Tensor, 
+            batch_ix : list[int],
+            dataloader_idx : int = 0,
+            ) -> torch.Tensor:
+        """
+        Performs a single training step.
+
+        Parameters:
+        ----------
+        batch (Any): 
+            The input batch data.
+        batch_ix (int): 
+            The index of the current batch.
+        dataloader_idx (int):
+            The index of the current dataloader. Defaults to 0, which will be
+            the case if there is only one dataloader.
+
+        Returns:
+        --------
+        torch.Tensor: 
+            The loss value for the training step.
+        """
+        self.loss_step(batch, 'train')
+
+
+    def validation_step(
+            self, 
+            batch : torch.Tensor, 
+            batch_ix : list[int],
+            dataloader_idx : int = 0,
+            ) -> None:
+        """
+        Perform a validation step on a batch of data.
+
+        Parameters:
+        ----------
+        batch (Any): 
+            The input batch data.
+        batch_ix (int): 
+            The index of the current batch.
+        dataloader_idx (int):
+            The index of the current dataloader. Defaults to 0, which will be
+            the case if there is only one dataloader.
+        """
+        self.loss_step(batch, 'val')
+
+
+    def test_step(
+            self, 
+            batch : torch.Tensor, 
+            batch_ix : list[int],
+            dataloader_idx : int = 0,
+            ) -> None:
+        """
+        Perform a test step on a batch of data.
+
+        Parameters:
+        ----------
+        batch (Any): 
+            The input batch data.
+        batch_ix (int): 
+            The index of the current batch.
+        dataloader_idx (int):
+            The index of the current dataloader. Defaults to 0, which will be
+            the case if there is only one dataloader.
+        """
+        self.loss_step(batch, 'test')
