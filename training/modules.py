@@ -395,14 +395,14 @@ class DenoisingDiffusionModule(pl.LightningModule):
     model (nn.Module):
         The model to be used as an approximate posterior for the noise. This 
         should map inputs to outputs of the same shape.
-    beta (torch.Tensor[float]):
+    beta (torch.Tensor):
         The betas for the diffusion process. The length of this tensor
         determines the number of steps in the forward diffusion process.
     """
     def __init__(
             self, 
             model : nn.Module,
-            beta : torch.Tensor[float],
+            beta : torch.Tensor,
             *args, **kwargs,
             ) -> None:
         super().__init__(*args, **kwargs)
