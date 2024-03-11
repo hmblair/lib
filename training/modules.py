@@ -568,6 +568,8 @@ class DenoisingDiffusionModule(pl.LightningModule):
         # compute the loss
         loss = self.objective(z_hat, z)
 
+        breakpoint()
+
         # log the loss
         self.log(
             name=phase + '_loss', 
