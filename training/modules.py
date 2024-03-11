@@ -477,6 +477,9 @@ class DenoisingDiffusionModule(pl.LightningModule):
             The graph with the denoised coordinates.
         """
 
+        # make a copy of the graph
+        graph = graph.local_var()
+
         # get the coordinates
         x = graph.ndata['coordinates']
 
@@ -554,6 +557,8 @@ class DenoisingDiffusionModule(pl.LightningModule):
 
         # apply the forward diffusion process
         z, x = self.forward_diffusion(batch, t)
+
+        breakpoint()
 
         # apply the reverse diffusion process
         z_hat = self.reverse_diffusion(x, t)
