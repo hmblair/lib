@@ -404,7 +404,9 @@ class DenoisingDiffusionModule(pl.LightningModule):
     def __init__(
             self, 
             model : nn.Module,
-            beta : torch.Tensor,
+            beta_low : float = 0.001,
+            beta_high : float = 0.02,
+            num_timesteps : int = 1000,
             *args, **kwargs,
             ) -> None:
         super().__init__(*args, **kwargs)
@@ -414,8 +416,8 @@ class DenoisingDiffusionModule(pl.LightningModule):
         self.objective = nn.MSELoss()
 
         # store the betas and compute the alphas
-        self.betas = beta
-        self.alpha = 1 - beta
+        self.betas = torch.linspace(beta_low, beta_high, num_timesteps)
+        self.alpha = 1 - self.betas
         self.alpha_bar = torch.cumprod(self.alpha, 0)
 
     
