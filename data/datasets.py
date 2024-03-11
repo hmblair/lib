@@ -305,3 +305,72 @@ class netCDFIterableDataset(IterableDataset):
         Return the number of batches across all datasets.
         """
         return sum([len(d) for d in self.data])
+    
+
+
+import dgl
+
+class DeepGraphLibraryIterableDataset(IterableDataset):
+    """
+    A PyTorch iterable dataset, that allows for iterating over batches taken
+    from a list of DGL graphs, optionally shuffling the data.
+
+    Parameters
+    ----------
+    graphs : list[DGLGraph]
+        The graphs to iterate over.
+    batch_size : int
+        The batch size.
+    rank : int
+        The rank of the current device. Defaults to 0.
+    world_size : int
+        The number of devices. Defaults to 1.
+    should_shuffle : bool
+        Whether the dataset should be shuffled. Defaults to True.
+    """
+    def __init__(
+            self, 
+            graphs : list[dgl.DGLGraph],
+            batch_size : int,
+            rank : int = 0,
+            world_size : int = 1,
+            should_shuffle : bool = True,
+            ) -> None:
+        if not graphs:
+            raise ValueError('At least one graph must be specified.')
+        self.graphs = graphs
+
+        self.slices = construct_slices_for_iterable_dataset(
+            num_datapoints=len(self.graphs),
+            batch_size=batch_size,
+            world_size=world_size,
+            rank=rank,
+            )
+        
+        self.should_shuffle = should_shuffle
+
+
+    def __len__(self) -> int:
+        """
+        Return the number of batches in the dataset.
+        """
+        return len(self.slices)
+    
+
+    def shuffle(self) -> None:
+        """
+        Shuffle the graphs in the dataset.
+        """
+        ix = np.random.permutation(len(self.graphs))
+        self.graphs = [self.graphs[i] for i in ix]
+
+
+    def __iter__(self) -> Iterable[dgl.DGLGraph]:
+        """
+        Iterate over the dataset in batches, shuffling the dataset if specified.
+        The graphs are yielded in DGL batches.
+        """
+        if self.should_shuffle:
+            self.shuffle()
+        for s in self.slices:
+            yield dgl.batch(self.graphs[s])
