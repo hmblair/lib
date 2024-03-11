@@ -573,7 +573,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
         # log the loss
         self.log(
             name=phase + '_loss', 
-            metric=loss, 
+            value=loss, 
             on_step=True,
             on_epoch=True, 
             batch_size=batch.batch_size,
