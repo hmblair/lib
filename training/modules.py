@@ -559,25 +559,23 @@ class DenoisingDiffusionModule(pl.LightningModule):
         # apply the forward diffusion process
         z, x = self.forward_diffusion(batch, t)
 
-        breakpoint()
-
         # apply the model
         z_hat = self.model(x, t)
-
-        breakpoint()
 
         # get the noise from the coordinates of z_hat
         z_hat = z_hat.ndata['coordinates']
 
-        breakpoint()
-
         # compute the loss
         loss = self.objective(z_hat, z)
 
-        breakpoint()
-
         # log the loss
-        self.log(phase + '_loss', loss, on_step=True, on_epoch=True)
+        self.log(
+            name=phase + '_loss', 
+            metric=loss, 
+            on_step=True,
+            on_epoch=True, 
+            batch_size=batch.batch_size,
+            )
 
     
     def training_step(
