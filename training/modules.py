@@ -454,7 +454,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
         # update the graph with the diffused coordinates
         graph.ndata['coordinates'] = diffuse_x
 
-        return z, diffuse_x
+        return z, graph
     
 
     def reverse_diffusion(self, graph : dgl.DGLGraph, t : int) -> torch.Tensor:
