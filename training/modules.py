@@ -550,7 +550,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
             The loss value for the training step.
         """
         # sample a random timestep
-        t = torch.randint(0, self.betas, (1,))
+        t = torch.randint(0, len(self.betas), (1,))
 
         # apply the forward diffusion process
         z, x = self.forward_diffusion(batch, t)
