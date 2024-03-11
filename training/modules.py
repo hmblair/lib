@@ -488,8 +488,9 @@ class DenoisingDiffusionModule(pl.LightningModule):
         z = 0 if t == 0 else torch.randn_like(x)
 
         # apply the reverse diffusion process
+        x_hat = self.model(graph, t)['coordinates']
         undiffuse_x =  1 / torch.sqrt(self.alpha[t]) * (
-            (x - (1 - self.alpha[t]) / torch.sqrt(1 - self.alpha_bar[t]) * self.model(graph, t)) \
+            (x - (1 - self.alpha[t]) / torch.sqrt(1 - self.alpha_bar[t]) * x_hat) \
                 + torch.sqrt(1 - self.alpha[t]) * z
         )
 
@@ -558,10 +559,8 @@ class DenoisingDiffusionModule(pl.LightningModule):
         # apply the forward diffusion process
         z, x = self.forward_diffusion(batch, t)
 
-        breakpoint()
-
-        # apply the reverse diffusion process
-        z_hat = self.reverse_diffusion(x, t)
+        # apply the model
+        z_hat = self.model(x, t)
 
         # get the noise from the coordinates of z_hat
         z_hat = z_hat.ndata['coordinates']
