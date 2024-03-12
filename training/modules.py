@@ -448,8 +448,6 @@ class DenoisingDiffusionModule(pl.LightningModule):
         # sample standard normal noise
         z = torch.randn_like(x)
 
-        print(x.device, z.device, self.alpha_bar[t].device)
-
         # apply the forward diffusion process
         diffuse_x = x * torch.sqrt(self.alpha_bar[t]) + z * torch.sqrt(1 - self.alpha_bar[t])
 
