@@ -415,10 +415,10 @@ class DenoisingDiffusionModule(pl.LightningModule):
         self.model = model
         self.objective = nn.MSELoss()
 
-        # store the betas and compute the alphas
-        self.betas = torch.linspace(beta_low, beta_high, num_timesteps, device=self.device)
-        self.alpha = 1 - self.betas
-        self.alpha_bar = torch.cumprod(self.alpha, 0)
+        # store the betas and compute the alphas, registering them as buffers
+        self.register_buffer('betas', torch.linspace(beta_low, beta_high, num_timesteps))
+        self.register_buffer('alpha', 1 - self.betas)
+        self.register_buffer('alpha_bar', torch.cumprod(self.alpha, 0))
 
     
     def forward_diffusion(self, graph : dgl.DGLGraph, t : int) -> tuple[torch.Tensor, torch.Tensor]:
