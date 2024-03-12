@@ -517,7 +517,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
         """
 
         # initialise the sample by sampling standard normal noise
-        x = torch.randn(shape)
+        x = torch.randn(shape, device=self.device)
 
         # apply the reverse diffusion process
         for t in range(len(self.betas) - 1, -1, -1):
