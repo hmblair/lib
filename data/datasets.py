@@ -130,9 +130,18 @@ def stack_xarray(ds : xr.Dataset, variables : list[str]) -> np.ndarray | None:
     np.ndarray | None
         The stacked dataset, or None if the list of variables is empty.
     """
+
+    # if the list of variables is empty, return None
     if not variables:
         return None
-    return np.stack([ds[name].values for name in variables], axis=-1).squeeze(0)
+    
+    # stack the variables into a numpy array
+    stack = np.stack([ds[name].values for name in variables], axis=-1)
+
+    # if the stack has a single dimension, remove it
+    if stack.shape[-1] == 1:
+        stack = stack[..., 0]
+    return stack
 
 
 
