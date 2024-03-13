@@ -132,7 +132,7 @@ def stack_xarray(ds : xr.Dataset, variables : list[str]) -> np.ndarray | None:
     """
     if not variables:
         return None
-    return np.stack([ds[name].values for name in variables], axis=-1).squeeze()
+    return np.stack([ds[name].values for name in variables], axis=-1).squeeze(0)
 
 
 
