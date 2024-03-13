@@ -384,7 +384,7 @@ class netCDFDataModule(BarebonesDataModule):
                     'The target variables must be specified if the phase is not "predict".'
                     )
             
-            if phase == 'train':
+            if phase != 'predict':
                 return netCDFIterableDataset(
                     paths = self.data_paths[phase],
                     batch_size = self.batch_size,
@@ -429,7 +429,7 @@ class netCDFDataModule(BarebonesDataModule):
                 )
 
         if self.data[phase] is not None:
-            if phase == 'train':
+            if phase != 'predict':
                 return DataLoader(
                     dataset = self.data[phase],
                     num_workers = self.num_workers,
