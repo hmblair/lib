@@ -7,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
-from pytorch_lightning.utilities.distributed import rank_zero_warn
+from pytorch_lightning.utilities import rank_zero_warn
 from .datasets import netCDFIterableDataset, netCDFIterableDatasetBase
 from .utils import get_filename, xarray_to_dict
 import numpy as np
