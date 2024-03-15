@@ -548,12 +548,12 @@ class DenoisingDiffusionModule(pl.LightningModule):
 
         # unpack the batch
         x, _ = batch
-        
+
         # sample a random timestep
         t = torch.randint(0, len(self.betas), (1,))
 
         # apply the forward diffusion process
-        z, x = self.forward_diffusion(batch, t)
+        z, x = self.forward_diffusion(x, t)
 
         # apply the model to get the predicted noise
         z_hat = self.model(x, t)
