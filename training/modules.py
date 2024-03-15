@@ -396,10 +396,17 @@ class DenoisingDiffusionModule(pl.LightningModule):
     ----------
     model (nn.Module):
         The model to be used as an approximate posterior for the noise. This 
-        should map inputs to outputs of the same shape.
-    beta (torch.Tensor):
-        The betas for the diffusion process. The length of this tensor
-        determines the number of steps in the forward diffusion process.
+        should map inputs to outputs of the same shape. In addition, it should 
+        take as input the timestep of the diffusion process.
+    beta_low (float):
+        The lower bound of the beta values used in the diffusion process. 
+        Defaults to 0.001.
+    beta_high (float):
+        The upper bound of the beta values used in the diffusion process. 
+        Defaults to 0.02.
+    num_timesteps (int):
+        The number of timesteps to use in the diffusion process. Defaults to 
+        1000.
     """
     def __init__(
             self, 
@@ -421,17 +428,17 @@ class DenoisingDiffusionModule(pl.LightningModule):
         self.register_buffer('alpha_bar', torch.cumprod(self.alpha, 0))
 
     
-    def forward_diffusion(self, graph : dgl.DGLGraph, t : int) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward_diffusion(self, x : torch.Tensor, t : int) -> tuple[torch.Tensor, torch.Tensor]:
         """
-        Applies t steps of the forward diffusion process to the coordinates
-        in the input graph, and returns the noise that was added to the
-        coordinates, along with the graph with the added noise.
+        Applies t steps of the forward diffusion process to the input coordinates,
+        and returns the noise that was added to the coordinates, along with the 
+        graph with the added noise.
 
         Parameters
         ----------
-        graph : dgl.DGLGraph
-            The input graph to be noised. It must have a node feature called
-            'coordinates', and an edge feature called 'rel_pos'.
+        x : torch.Tensor
+            The input tensor to which the forward diffusion process is to be
+            applied.
         t : int
             The number of forward diffusion steps to apply.
         
@@ -439,50 +446,37 @@ class DenoisingDiffusionModule(pl.LightningModule):
         -------
         torch.Tensor
             The noise which was added to the input tensor, of the same shape as x.
-        dgl.DGLGraph
-            The input graph, whose coordinates have been noised.
+        torch.Tensor
+            The tensor with the added noise.
         """
-        # get the coordinates and relative positions
-        x = graph.ndata['coordinates']
-
         # sample standard normal noise
         z = torch.randn_like(x)
 
         # apply the forward diffusion process
         diffuse_x = x * torch.sqrt(self.alpha_bar[t]) + z * torch.sqrt(1 - self.alpha_bar[t])
 
-        # update the graph with the diffused coordinates
-        graph.ndata['coordinates'] = diffuse_x
-
-        return z, graph
+        return z, diffuse_x
     
 
-    def reverse_diffusion(self, graph : dgl.DGLGraph, t : int) -> torch.Tensor:
+    def reverse_diffusion(self, x : torch.Tensor, t : int) -> torch.Tensor:
         """
         Applies a single step of the reverse diffusion process to the coordinates
         of the input graph.
 
         Parameters
         ----------
-        graph : dgl.DGLGraph
-            The input graph whose coordinates are to be denoised. It must have a
-            node feature called 'coordinates'.
+        x : torch.Tensor
+            The input tensor to which the reverse diffusion process is to be
+            applied.
         add_noise : bool, optional
             Whether to add standard normal noise to the denoised tensor. 
             Defaults to True.
 
         Returns
         -------
-        dgl.DGLGraph
-            The graph with the denoised coordinates.
+        torch.Tensor
+            The denoised tensor.
         """
-
-        # make a copy of the graph
-        graph = graph.local_var()
-
-        # get the coordinates
-        x = graph.ndata['coordinates']
-
         # sample standard normal noise at all steps except the final step
         # (which is the first step of the forward diffusion process)
         z = 0 if t == 0 else torch.randn_like(x)
@@ -494,10 +488,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
                 + torch.sqrt(1 - self.alpha[t]) * z
         )
 
-        # update the graph with the undiffused coordinates
-        graph.ndata['coordinates'] = undiffuse_x
-
-        return graph
+        return undiffuse_x
     
 
     def forward(self, shape : torch.Size) -> torch.Tensor:
@@ -559,11 +550,8 @@ class DenoisingDiffusionModule(pl.LightningModule):
         # apply the forward diffusion process
         z, x = self.forward_diffusion(batch, t)
 
-        # apply the model
+        # apply the model to get the predicted noise
         z_hat = self.model(x, t)
-
-        # get the noise from the coordinates of z_hat
-        z_hat = z_hat.ndata['coordinates']
 
         # compute the loss
         loss = self.objective(z_hat, z)
@@ -574,7 +562,6 @@ class DenoisingDiffusionModule(pl.LightningModule):
             value=loss, 
             on_step=True,
             on_epoch=True, 
-            batch_size=batch.batch_size,
             )
 
     
