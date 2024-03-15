@@ -414,13 +414,14 @@ class DenoisingDiffusionModule(pl.LightningModule):
             beta_low : float = 0.001,
             beta_high : float = 0.02,
             num_timesteps : int = 1000,
+            objective : Optional[nn.Module] = None,
             *args, **kwargs,
             ) -> None:
         super().__init__(*args, **kwargs)
 
         # store the model and the objective
         self.model = model
-        self.objective = nn.MSELoss()
+        self.objective = objective
 
         # store the betas and compute the alphas, registering them as buffers
         self.register_buffer('betas', torch.linspace(beta_low, beta_high, num_timesteps))
