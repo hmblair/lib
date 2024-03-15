@@ -7,6 +7,7 @@ from abc import ABCMeta, abstractmethod
 import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
+from pytorch_lightning.utilities.distributed import rank_zero_warn
 from .datasets import netCDFIterableDataset, netCDFIterableDatasetBase
 from .utils import get_filename, xarray_to_dict
 import numpy as np
@@ -380,8 +381,10 @@ class netCDFDataModule(BarebonesDataModule):
         """
         if self.data_paths[phase] is not None:
             if phase != 'predict' and not self.target_variables:
-                raise ValueError(
-                    'The target variables must be specified if the phase is not "predict".'
+                rank_zero_warn(
+                    f'No target variables were specified for the {phase} dataset. ' \
+                    'If this was intended, please ignore this warning. Otherwise, ' \
+                    'your model may fail to train or validate correctly.'
                     )
             
             if phase != 'predict':
