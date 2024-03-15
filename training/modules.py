@@ -383,8 +383,6 @@ class FinetuningModuleDenseHead(PipelineModule):
     
 
 
-import dgl
-
 class DenoisingDiffusionModule(pl.LightningModule):
     """
     Implements a denoising diffusion model, which is trained to predict the
@@ -392,12 +390,23 @@ class DenoisingDiffusionModule(pl.LightningModule):
     forward method of this class samples from the distribution of the diffusion
     model, by repeatedly applying the reverse diffusion process.
 
+    This module allows for conditioning variables that are not part of the
+    diffusion process. To account for this, the input diffused_variable is
+    must be specified, so that that the module knows which variable to apply
+    the forward and reverse diffusion processes to.
+
+    To sample from the diffusion model, call the forward method with the
+    desired shape of the output tensor.
+
     Parameters:
     ----------
     model (nn.Module):
         The model to be used as an approximate posterior for the noise. This 
         should map inputs to outputs of the same shape. In addition, it should 
         take as input the timestep of the diffusion process.
+    diffused_variable (str):
+        The name of the variable which is used for the forward and reverse
+        diffusion processes.
     beta_low (float):
         The lower bound of the beta values used in the diffusion process. 
         Defaults to 0.001.
@@ -411,6 +420,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
     def __init__(
             self, 
             model : nn.Module,
+            diffused_variable : str,
             beta_low : float = 0.001,
             beta_high : float = 0.02,
             num_timesteps : int = 1000,
@@ -419,8 +429,9 @@ class DenoisingDiffusionModule(pl.LightningModule):
             ) -> None:
         super().__init__(*args, **kwargs)
 
-        # store the model and the objective
+        # store the model, diffused variable, and objective
         self.model = model
+        self.diffused_variable = diffused_variable
         self.objective = objective
 
         # store the betas and compute the alphas, registering them as buffers
@@ -431,9 +442,9 @@ class DenoisingDiffusionModule(pl.LightningModule):
     
     def forward_diffusion(self, x : torch.Tensor, t : int) -> tuple[torch.Tensor, torch.Tensor]:
         """
-        Applies t steps of the forward diffusion process to the input coordinates,
-        and returns the noise that was added to the coordinates, along with the 
-        graph with the added noise.
+        Applies t steps of the forward diffusion process to the input variable,
+        and returns the noise that was added to the variable, along with the 
+        variable with the added noise.
 
         Parameters
         ----------
@@ -461,8 +472,8 @@ class DenoisingDiffusionModule(pl.LightningModule):
 
     def reverse_diffusion(self, x : torch.Tensor, t : int) -> torch.Tensor:
         """
-        Applies a single step of the reverse diffusion process to the coordinates
-        of the input graph.
+        Applies a single step of the reverse diffusion process to the input
+        variable, and returns the denoised variable.
 
         Parameters
         ----------
@@ -483,15 +494,15 @@ class DenoisingDiffusionModule(pl.LightningModule):
         z = 0 if t == 0 else torch.randn_like(x)
 
         # apply the reverse diffusion process
-        x_hat = self.model(x, t)['coordinates']
+        x_hat = self.model(x, t)
         undiffuse_x =  1 / torch.sqrt(self.alpha[t]) * (
             (x - (1 - self.alpha[t]) / torch.sqrt(1 - self.alpha_bar[t]) * x_hat) \
                 + torch.sqrt(1 - self.alpha[t]) * z
         )
 
         return undiffuse_x
-    
 
+    
     def forward(self, shape : torch.Size) -> torch.Tensor:
         """
         Samples from the distribution of the diffusion model, by repeatedly
@@ -520,7 +531,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
 
     def loss_step(
             self, 
-            batch : torch.Tensor, 
+            batch : dict[str, torch.Tensor],
             phase : str,
             ) -> torch.Tensor:
         """
@@ -552,11 +563,12 @@ class DenoisingDiffusionModule(pl.LightningModule):
         # sample a random timestep
         t = torch.randint(0, len(self.betas), (1,))
 
-        # apply the forward diffusion process
-        z, x = self.forward_diffusion(x, t)
+        # apply the forward diffusion process to the diffused variable
+        diffused_var = x[self.diffused_variable]
+        z, diffused_var = self.forward_diffusion(diffused_var, t)
 
         # apply the model to get the predicted noise
-        z_hat = self.model(x, t)
+        z_hat = self.model(**x, t=t)
 
         # compute the loss
         loss = self.objective(z_hat, z)
@@ -567,12 +579,15 @@ class DenoisingDiffusionModule(pl.LightningModule):
             value=loss, 
             on_step=True,
             on_epoch=True, 
+            prog_bar=True,
             )
+        
+        return loss
 
     
     def training_step(
             self, 
-            batch : torch.Tensor, 
+            batch : dict[str, torch.Tensor],
             batch_ix : list[int],
             dataloader_idx : int = 0,
             ) -> torch.Tensor:
@@ -594,12 +609,12 @@ class DenoisingDiffusionModule(pl.LightningModule):
         torch.Tensor: 
             The loss value for the training step.
         """
-        self.loss_step(batch, 'train')
+        return self.loss_step(batch, 'train')
 
 
     def validation_step(
             self, 
-            batch : torch.Tensor, 
+            batch : dict[str, torch.Tensor],
             batch_ix : list[int],
             dataloader_idx : int = 0,
             ) -> None:
@@ -621,7 +636,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
 
     def test_step(
             self, 
-            batch : torch.Tensor, 
+            batch : dict[str, torch.Tensor],
             batch_ix : list[int],
             dataloader_idx : int = 0,
             ) -> None:
