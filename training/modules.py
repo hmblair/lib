@@ -483,7 +483,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
         z = 0 if t == 0 else torch.randn_like(x)
 
         # apply the reverse diffusion process
-        x_hat = self.model(graph, t)['coordinates']
+        x_hat = self.model(x, t)['coordinates']
         undiffuse_x =  1 / torch.sqrt(self.alpha[t]) * (
             (x - (1 - self.alpha[t]) / torch.sqrt(1 - self.alpha_bar[t]) * x_hat) \
                 + torch.sqrt(1 - self.alpha[t]) * z
@@ -545,6 +545,10 @@ class DenoisingDiffusionModule(pl.LightningModule):
         torch.Tensor
             The loss value for the training step.
         """
+
+        # unpack the batch
+        x, _ = batch
+        
         # sample a random timestep
         t = torch.randint(0, len(self.betas), (1,))
 
