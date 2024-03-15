@@ -176,7 +176,7 @@ class netCDFIterableDatasetBase(IterableDataset):
             self, 
             path : str,
             batch_size : int, 
-            input_variables : list[str],
+            input_variables : list[str] = [],
             target_variables : list[str] = [],
             rank : int = 0,
             world_size : int = 1,
@@ -249,16 +249,22 @@ class netCDFIterableDatasetBase(IterableDataset):
         batch are stacked into numpy arrays and yielded. If the list of target
         variables is empty, the targets are set to None.
         """
+
         # shuffle the dataset if specified
         if self.should_shuffle:
             self.shuffle()    
+
         # iterate over the slices, transforming the batches as necessary, and
         # yielding the slice at the input and target variables
         for s in self.slices:
             batch = self.ds.isel(batch=s)
             for transform in self.transforms:
                 batch = transform(batch)
-            yield stack_xarray(batch, self.input_variables), stack_xarray(batch, self.target_variables)
+            
+            # get the input and target variables
+            x = {var : batch[var].values for var in self.input_variables} if self.input_variables else None
+            y = {var : batch[var].values for var in self.target_variables} if self.target_variables else None
+            yield x, y
 
 
 
