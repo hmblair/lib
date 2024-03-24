@@ -580,8 +580,10 @@ class DenoisingDiffusionModule(pl.LightningModule):
         z, diffused_var = self.forward_diffusion(diffused_var, t)
 
         # apply the model to get the predicted noise
-        z_hat = self.model(diffused_var, **x, t=t)
-
+        z_hat = self.model(
+            **{self.diffused_variable : diffused_var}, **x, t=t,
+            )
+        
         # compute the loss
         loss = self.objective(z_hat, z)
 
