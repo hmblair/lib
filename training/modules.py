@@ -536,9 +536,9 @@ class DenoisingDiffusionModule(pl.LightningModule):
         x = torch.randn(shape, device=self.device)
 
         # apply the reverse diffusion process
-        for t in trange(len(self.betas) - 1, -1, -1):
-            x = self.reverse_diffusion(x, t, **kwargs)
-            print(x.shape)
+        with torch.no_grad():
+            for t in trange(len(self.betas) - 1, -1, -1):
+                x = self.reverse_diffusion(x, t, **kwargs)
         return x
     
 
