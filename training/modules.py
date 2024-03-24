@@ -470,7 +470,12 @@ class DenoisingDiffusionModule(pl.LightningModule):
         return z, diffuse_x
     
 
-    def reverse_diffusion(self, x : torch.Tensor, t : int) -> torch.Tensor:
+    def reverse_diffusion(
+            self, 
+            x : torch.Tensor, 
+            t : int, 
+            **kwargs : dict,
+            ) -> torch.Tensor:
         """
         Applies a single step of the reverse diffusion process to the input
         variable, and returns the denoised variable.
@@ -480,9 +485,10 @@ class DenoisingDiffusionModule(pl.LightningModule):
         x : torch.Tensor
             The input tensor to which the reverse diffusion process is to be
             applied.
-        add_noise : bool, optional
-            Whether to add standard normal noise to the denoised tensor. 
-            Defaults to True.
+        t : int
+            The timestep of the reverse diffusion process.
+        kwargs : dict
+            Additional keyword arguments to pass to the model.
 
         Returns
         -------
@@ -493,8 +499,10 @@ class DenoisingDiffusionModule(pl.LightningModule):
         # (which is the first step of the forward diffusion process)
         z = 0 if t == 0 else torch.randn_like(x)
 
+        # apply the model to get the predicted noise
+        x_hat = self.model(x, **kwargs, t=t)
+
         # apply the reverse diffusion process
-        x_hat = self.model(x, t)
         undiffuse_x =  1 / torch.sqrt(self.alpha[t]) * (
             (x - (1 - self.alpha[t]) / torch.sqrt(1 - self.alpha_bar[t]) * x_hat) \
                 + torch.sqrt(1 - self.alpha[t]) * z
@@ -503,7 +511,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
         return undiffuse_x
 
     
-    def forward(self, shape : torch.Size) -> torch.Tensor:
+    def forward(self, shape : torch.Size, **kwargs) -> torch.Tensor:
         """
         Samples from the distribution of the diffusion model, by repeatedly
         applying the reverse diffusion process. 
@@ -524,14 +532,14 @@ class DenoisingDiffusionModule(pl.LightningModule):
 
         # apply the reverse diffusion process
         for t in range(len(self.betas) - 1, -1, -1):
-            x = self.reverse_diffusion(x, t)
+            x = self.reverse_diffusion(x, t, **kwargs)
 
         return x
     
 
     def loss_step(
             self, 
-            batch : dict[str, torch.Tensor],
+            batch : tuple[dict[str, torch.Tensor]],
             phase : str,
             ) -> torch.Tensor:
         """
@@ -564,11 +572,11 @@ class DenoisingDiffusionModule(pl.LightningModule):
         t = torch.randint(0, len(self.betas), (1,))
 
         # apply the forward diffusion process to the diffused variable
-        diffused_var = x[self.diffused_variable]
+        diffused_var = x.pop(self.diffused_variable)
         z, diffused_var = self.forward_diffusion(diffused_var, t)
 
         # apply the model to get the predicted noise
-        z_hat = self.model(**x, t=t)
+        z_hat = self.model(diffused_var, **x, t=t)
 
         # compute the loss
         loss = self.objective(z_hat, z)
