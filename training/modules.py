@@ -509,9 +509,8 @@ class DenoisingDiffusionModule(pl.LightningModule):
 
         # apply the reverse diffusion process
         undiffuse_x =  1 / torch.sqrt(self.alpha[t]) * (
-            (x - (1 - self.alpha[t]) / torch.sqrt(1 - self.alpha_bar[t]) * x_hat) \
-                + torch.sqrt(1 - self.alpha[t]) * z
-        )
+            (x - (1 - self.alpha[t]) / torch.sqrt(1 - self.alpha_bar[t]) * x_hat) 
+        ) + torch.sqrt(self.betas[t]) * z
 
         return undiffuse_x
 
