@@ -500,7 +500,11 @@ class DenoisingDiffusionModule(pl.LightningModule):
         z = 0 if t == 0 else torch.randn_like(x)
 
         # apply the model to get the predicted noise
-        x_hat = self.model(x, **kwargs, t=t)
+        x_hat = self.model(
+            **{self.diffused_variable : x},
+            **kwargs, 
+            t=t,
+            )
 
         # apply the reverse diffusion process
         undiffuse_x =  1 / torch.sqrt(self.alpha[t]) * (
