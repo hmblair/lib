@@ -537,6 +537,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
 
         # apply the reverse diffusion process
         for t in trange(len(self.betas) - 1, -1, -1):
+            print(torch.cuda.memory_allocated())
             x = self.reverse_diffusion(x, t, **kwargs)
 
         return x
