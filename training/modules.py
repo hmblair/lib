@@ -538,13 +538,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
         # apply the reverse diffusion process
         for t in trange(len(self.betas) - 1, -1, -1):
             x = self.reverse_diffusion(x, t, **kwargs)
-            import gc
-            for obj in gc.get_objects():
-                try:
-                    if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
-                        print(type(obj), obj.size())
-                except:
-                    pass
+            print(x.shape)
         return x
     
 
