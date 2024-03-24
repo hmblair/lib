@@ -382,6 +382,7 @@ class FinetuningModuleDenseHead(PipelineModule):
             )
     
 
+from tqdm import trange
 
 class DenoisingDiffusionModule(pl.LightningModule):
     """
@@ -535,7 +536,7 @@ class DenoisingDiffusionModule(pl.LightningModule):
         x = torch.randn(shape, device=self.device)
 
         # apply the reverse diffusion process
-        for t in range(len(self.betas) - 1, -1, -1):
+        for t in trange(len(self.betas) - 1, -1, -1):
             x = self.reverse_diffusion(x, t, **kwargs)
 
         return x
