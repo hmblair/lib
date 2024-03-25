@@ -162,7 +162,7 @@ class PipelineModule(pl.LightningModule):
         x, _ = batch
 
         # return the input and the predicted output
-        return self(x)
+        return self(**x)
     
 
     def _compute_and_log_losses(
