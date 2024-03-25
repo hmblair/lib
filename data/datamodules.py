@@ -287,33 +287,32 @@ class netCDFDataModule(BarebonesDataModule):
     stack_dim (int, optional):
         The dimension to stack the input and target variables along. Defaults
         to -1.
-    train_paths (list[str], optional):
-        The paths to the training data. Defaults to None. If a path points to a
-        directory, all files with the extension '.nc' in the directory are
-        loaded.
-    validate_paths (list[str], optional):
-        The paths to the validation data. Defaults to None.
-    test_paths (list[str], optional)):
-        The paths to the testing data. Defaults to None.
-    predict_paths (list[str], optional)):
-        The paths to the prediction data. Defaults to None.
+    paths (dict[str, list[str]]):
+        A dictionary containing the paths to the data for each phase. The 
+        phases can be 'train', 'validate', 'test', or 'predict'. The paths can
+        be directories containing netCDF files, or the netCDF files themselves.
+    transforms (dict[str, list[Callable[[xr.Dataset], xr.Dataset]]]):
+        A dictionary containing a list of transforms for each phase. The 
+        transforms are applied to the dataset before it is returned.
     """
     def __init__(
             self, 
             input_variables : list[tuple[str, str]] = [],
             target_variables : list[tuple[str, str]] = [],
             stack_dim : int = -1,
-            train_paths : Optional[list[str]] = None,
-            validate_paths : Optional[list[str]] = None,
-            test_paths : Optional[list[str]] = None,
-            predict_paths : Optional[list[str]] = None,
-            train_transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
-            validate_transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
-            test_transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
-            predict_transforms : list[Callable[[xr.Dataset], xr.Dataset]] = [],
+            paths : dict[str, list[str]] = {},
+            transforms : dict[str, list[Callable[[xr.Dataset], xr.Dataset]]] = {},
             *args, **kwargs,
             ) -> None:
         super().__init__(*args, **kwargs)
+
+        # specify the valid phases, and ensure the provided paths are valid
+        VALID_PHASES = ['train', 'validate', 'test', 'predict']
+        for phase in paths.keys():
+            if phase not in VALID_PHASES:
+                raise ValueError(
+                    f'Invalid phase {phase}. The phase must be one of {VALID_PHASES}.'
+                    )
 
         # store the variables
         self.input_variables = input_variables
@@ -323,43 +322,26 @@ class netCDFDataModule(BarebonesDataModule):
         self.stack_dim = stack_dim
 
         # recursively find files in the specified directories
-        for paths in [train_paths, validate_paths, test_paths, predict_paths]:
-            if paths is None:
-                continue
-            for path in paths:
-                if os.path.isdir(path):
-                    paths.extend(
-                        recursively_find_files(path, '.nc')
-                        )
-                    paths.remove(path)
-
-            # remove any duplicate paths
-            paths = list(set(paths))
-
-        # store the paths to each dataset
-        self.data_paths = {
-            'train': train_paths,
-            'validate': validate_paths,
-            'test': test_paths,
-            'predict': predict_paths,
-            }
+        self.data_paths = {}
+        for phase, phase_paths in paths.items():
+            if phase_paths is not None:
+                self.data_paths[phase] = []
+                for path in phase_paths:
+                    if os.path.isdir(path):
+                        self.data_paths[phase].extend(
+                            recursively_find_files(path, '.nc')
+                            )
+                    else:
+                        self.data_paths[phase].append(path)
         
         # store the names of each dataset
         get_data_names = lambda paths: [get_filename(path) for path in paths] if paths is not None else None
         self.data_names = {
-            'train': get_data_names(train_paths),
-            'validate': get_data_names(validate_paths),
-            'test': get_data_names(test_paths),
-            'predict': get_data_names(predict_paths),
+            phase : get_data_names(paths) for phase, paths in self.data_paths.items()
             }
         
-        # store the transform
-        self.transforms = {
-            'train': train_transforms,
-            'validate': validate_transforms,
-            'test': test_transforms,
-            'predict': predict_transforms,
-            }
+        # store the transforms
+        self.transforms = {phase : transforms.get(phase, []) for phase in VALID_PHASES}
 
         # raise an error if the number of workers is greater than 1
         if self.num_workers > 1:
