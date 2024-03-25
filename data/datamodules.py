@@ -300,8 +300,8 @@ class netCDFDataModule(BarebonesDataModule):
     """
     def __init__(
             self, 
-            input_variables : list[str],
-            target_variables : list[str] = [],
+            input_variables : list[tuple[str, str]] = [],
+            target_variables : list[tuple[str, str]] = [],
             stack_dim : int = -1,
             train_paths : Optional[list[str]] = None,
             validate_paths : Optional[list[str]] = None,
