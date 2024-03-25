@@ -176,8 +176,8 @@ class netCDFIterableDatasetBase(IterableDataset):
             self, 
             path : str,
             batch_size : int, 
-            input_variables : list[str] = [],
-            target_variables : list[str] = [],
+            input_variables : list[tuple[str, str]] = [],
+            target_variables : list[tuple[str, str]] = [],
             rank : int = 0,
             world_size : int = 1,
             should_shuffle : bool = True,
@@ -208,13 +208,13 @@ class netCDFIterableDatasetBase(IterableDataset):
         
         # verify that the input and target variables exist in the dataset, and
         # store the input and target variables
-        for variable in input_variables + target_variables:
-            if not variable in self.ds.data_vars:
-                raise ValueError(
-                    f'The variable "{variable}" does not exist in the dataset.'
-                    )
-        if not input_variables:
-            raise ValueError('At least one input variable must be specified.')
+        # for variable in input_variables + target_variables:
+        #     if not variable in self.ds.data_vars:
+        #         raise ValueError(
+        #             f'The variable "{variable}" does not exist in the dataset.'
+        #             )
+        # if not input_variables:
+        #     raise ValueError('At least one input variable must be specified.')
         self.input_variables = input_variables
         self.target_variables = target_variables
 
@@ -262,8 +262,8 @@ class netCDFIterableDatasetBase(IterableDataset):
                 batch = transform(batch)
             
             # get the input and target variables
-            x = {var : batch[var].values for var in self.input_variables} if self.input_variables else None
-            y = {var : batch[var].values for var in self.target_variables} if self.target_variables else None
+            x = {name : batch[var].values for var, name in self.input_variables} if self.input_variables else None
+            y = {name : batch[var].values for var, name in self.target_variables} if self.target_variables else None
             yield x, y
 
 
@@ -277,8 +277,8 @@ class netCDFIterableDataset(IterableDataset):
             self, 
             paths : list[str], 
             batch_size : int,
-            input_variables : list[str],
-            target_variables : list[str],
+            input_variables : list[tuple[str, str]] = [],
+            target_variables : list[tuple[str, str]] = [],
             rank : int = 0,
             world_size : int = 1,
             should_shuffle : bool = True,
