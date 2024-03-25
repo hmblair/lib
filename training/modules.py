@@ -191,10 +191,10 @@ class PipelineModule(pl.LightningModule):
         x, y = batch
 
         # get the model output
-        y_hat = self(x) 
+        y_hat = self(**x) 
 
         # compute the losses
-        losses = {name : obj(y_hat, y) for name, obj in self.objectives.items()}
+        losses = {name : obj(y_hat, **y) for name, obj in self.objectives.items()}
 
         # loop through the losses, ensuring that they are valid and logging them
         for name, value in losses.items():
