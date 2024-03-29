@@ -8,7 +8,7 @@ import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_warn
-from .datasets import XarrayDataset
+from .datasets import XarrayIterableDataset
 from .utils import get_filename
 import xarray as xr
 from .constants import NC_EXTENSION
@@ -368,7 +368,7 @@ class XarrayDataModule(BarebonesDataModule):
                     )
             
             if phase != 'predict':
-                return XarrayDataset(
+                return XarrayIterableDataset(
                     paths = self.data_paths[phase],
                     batch_size = self.batch_size,
                     input_variables = self.input_variables,
@@ -379,7 +379,7 @@ class XarrayDataModule(BarebonesDataModule):
                     transforms = self.transforms[phase]
                     )
             else:
-                return [XarrayDataset(
+                return [XarrayIterableDataset(
                     paths = [path],
                     batch_size = self.batch_size,
                     input_variables = self.input_variables,
