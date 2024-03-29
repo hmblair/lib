@@ -2,16 +2,16 @@
 
 import warnings
 import os
-from typing import Any, Union, Iterable, Sequence, Optional, Callable
+from typing import Iterable, Sequence, Callable
 from abc import ABCMeta, abstractmethod
 import torch
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_warn
-from .datasets import netCDFIterableDataset, netCDFIterableDatasetBase
-from .utils import get_filename, xarray_to_dict
-import numpy as np
+from .datasets import XarrayDataset
+from .utils import get_filename
 import xarray as xr
+from constants import NC_EXTENSION
 
 class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
     """
@@ -272,8 +272,7 @@ def recursively_find_files(dir : str, extension : str) -> list[str]:
     return files
 
 
-
-class netCDFDataModule(BarebonesDataModule):
+class XarrayDataModule(BarebonesDataModule):
     """
     A DataModule for netCDF data, providing functionality for loading, 
     transforming, and batching the data.
@@ -324,15 +323,14 @@ class netCDFDataModule(BarebonesDataModule):
         # recursively find files in the specified directories
         self.data_paths = {}
         for phase, phase_paths in paths.items():
-            if phase_paths is not None:
-                self.data_paths[phase] = []
-                for path in phase_paths:
-                    if os.path.isdir(path):
-                        self.data_paths[phase].extend(
-                            recursively_find_files(path, '.nc')
-                            )
-                    else:
-                        self.data_paths[phase].append(path)
+            self.data_paths[phase] = []
+            for path in phase_paths:
+                if os.path.isdir(path):
+                    self.data_paths[phase].extend(
+                        recursively_find_files(path, NC_EXTENSION)
+                        )
+                else:
+                    self.data_paths[phase].append(path)
         
         # store the names of each dataset
         get_data_names = lambda paths: [get_filename(path) for path in paths] if paths is not None else None
@@ -370,7 +368,7 @@ class netCDFDataModule(BarebonesDataModule):
                     )
             
             if phase != 'predict':
-                return netCDFIterableDataset(
+                return XarrayDataset(
                     paths = self.data_paths[phase],
                     batch_size = self.batch_size,
                     input_variables = self.input_variables,
@@ -381,8 +379,8 @@ class netCDFDataModule(BarebonesDataModule):
                     transforms = self.transforms[phase]
                     )
             else:
-                return [netCDFIterableDatasetBase(
-                    path = path,
+                return [XarrayDataset(
+                    paths = [path],
                     batch_size = self.batch_size,
                     input_variables = self.input_variables,
                     target_variables = self.target_variables if phase != 'predict' else [],
