@@ -299,8 +299,8 @@ class XarrayIterableDataset(IterableDataset):
             self : XarrayIterableDataset,
             paths : list[str],
             batch_size : int,
-            input_variables : list[tuple[str, str]] = [],
-            target_variables : list[tuple[str, str]] = [],
+            input_variables : list[tuple[list[str], str]] = [],
+            target_variables : list[tuple[list[str], str]] = [],
             rank : int = 0,
             world_size : int = 1,
             should_shuffle : bool = False,
@@ -377,10 +377,10 @@ class XarrayIterableDataset(IterableDataset):
             # loop over the indices
             for path, ix in idx:
                 batch = self.datasets[path][ix]
-                x = {out_name : batch[in_name].values 
-                        for in_name, out_name in self.input_variables}
-                y = {out_name : batch[in_name].values 
-                        for in_name, out_name in self.target_variables}
+                x = {out_name : stack_xarray(batch, in_names)
+                        for in_names, out_name in self.input_variables}
+                y = {out_name : stack_xarray(batch, in_names)
+                        for in_names, out_name in self.target_variables}
                 yield x, y
     
     
