@@ -296,8 +296,8 @@ class XarrayDataModule(BarebonesDataModule):
     """
     def __init__(
             self, 
-            input_variables : list[tuple[str, str]] = [],
-            target_variables : list[tuple[str, str]] = [],
+            input_variables : list[tuple[list[str], str]] = [],
+            target_variables : list[tuple[list[str], str]] = [],
             stack_dim : int = -1,
             paths : dict[str, list[str]] = {},
             transforms : dict[str, list[Callable[[xr.Dataset], xr.Dataset]]] = {},
