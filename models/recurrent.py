@@ -276,7 +276,6 @@ class RecurrentEncoderDecoderWithAttention(nn.Module):
             num_encoder_layers : int,
             num_decoder_layers : int,
             num_heads : int, 
-            num_concat_dims : int = 1,
             dropout : float = 0.0,
             attention_dropout : float = 0.0,
             pooling : Optional[dict] = None,
@@ -289,7 +288,6 @@ class RecurrentEncoderDecoderWithAttention(nn.Module):
             embedding_dims = embedding_dims,
             num_layers = num_encoder_layers,
             dropout = dropout,
-            num_concat_dims = num_concat_dims,
             )
         # initialize the attention layer
         self.attention = MultiHeadSelfAttention(
