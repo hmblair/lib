@@ -4,53 +4,62 @@ import torch.nn as nn
 import torch
 from .normalisation import BatchNorm
 
-class IntegerEmbedding(nn.Embedding):
+class IntegerEmbedding(nn.Module):
     """
     A simple wrapper around nn.Embedding, which performs Xavier initialization
     of the weights and calls x.long() on the input before passing it to the
-    embedding layer.
+    embedding layer. It also supports having multiple independent embedding
+    layers, which are concatenated along the final dimension.
 
     Parameters:
     -----------
     num_embeddings (int):
-        The maximum number of embeddings.
-    embedding_dim (int):
-        The dimension of the embeddings.
-    num_concat_dims (bool):
-        The number of dimensions to concatenate. If greater than 1, then the
-        embedding dimension will be divided by this number, and the output
-        will be stacked along the last dimension, so that the output will have
-        final dimension equal to the original embedding dimension. Defaults to 1.
+        The maximum integer index that can be used to index the embeddings.
+        If a list of integers is provided, then each embedding layer will
+        have a different number of embeddings. In this case, the length of
+        the list must be equal to the length of embedding_dims.
+    embedding_dims (list[int]):
+        The dimensions of the embedding layer. Treating the final dimension of 
+        the input as a feature dimension, each element of the final dimension
+        is passed through a separate embedding layer, and the results are concatenated
+        along the final dimension. Hence, the final dimension of the output will
+        have size equal to the sum of the elements of embedding_dims.
     use_batchnorm (bool):
         Whether to use batch normalisation. Defaults to False.
-    *args:
-        Additional arguments to nn.Embedding.
-    **kwargs:
-        Additional keyword arguments to nn.Embedding.
     """
     def __init__(
             self,
-            num_embeddings : int,
-            embedding_dim : int,
-            num_concat_dims : int = 1,
+            num_embeddings : list[int],
+            embedding_dims : list[int],
             use_batchnorm : bool = False,
             *args, **kwargs,
             ) -> None:
-        if embedding_dim % num_concat_dims != 0:
+        super().__init__(*args, **kwargs)
+
+        # ensure that the number of embeddings and the number of embedding dimensions
+        # are the same
+        if not len(num_embeddings) == len(embedding_dims):
             raise ValueError(
-                f'The embedding dimension ({embedding_dim}) must be divisible by the number of dimensions to concatenate ({num_concat_dims}).'
+                f'The number of embedding dimensions {len(num_embeddings)} must be the same as the number of embeddings {len(embedding_dims)}.'
                 )
-        embedding_dim = embedding_dim // num_concat_dims
-        super().__init__(num_embeddings, embedding_dim, *args, **kwargs)
-        # initialize the weights of the embedding layer
+        
+        # initialise the embedding layers
+        self.embedding_layers = nn.ModuleList([
+            nn.Embedding(num_embedding, embedding_dim)
+            for num_embedding, embedding_dim 
+            in zip(num_embeddings, embedding_dims)
+        ])
+
+        # store the embedding dimensions
+        self.embedding_dims = embedding_dims
+
+        # initialize the weights of the embedding layers
         gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_uniform_(self.weight, gain)
-        if self.padding_idx is not None:
-            nn.init.constant_(
-                self.weight[self.padding_idx], 0
-                )
+        for embedding_layer in self.embedding_layers:
+            nn.init.xavier_uniform_(embedding_layer.weight, gain)
+            
         # initialize the batch normalisation layer
-        self.batchnorm = BatchNorm(embedding_dim) if use_batchnorm else None
+        self.batchnorm = BatchNorm(sum(embedding_dims)) if use_batchnorm else None
 
 
     def forward(self, x : torch.Tensor) -> torch.Tensor:
@@ -61,18 +70,27 @@ class IntegerEmbedding(nn.Embedding):
         Parameters:
         -----------
         x (torch.Tensor):
-            The input to the embedding layer, of shape (batch_size, seq_len, *d).
-            It must be of a type that can be cast to a long tensor. 
+            The input to the embedding layer, of shape (..., n), where n is the 
+            length of self.embedding_dims. If n is 1, then the final dimension 
+            can be omitted.
 
         Returns:
         --------
         torch.Tensor:
             The output of the embedding layer, of dtype self.dtype. If concat_dims
-            is False, then the output will have shape (batch_size, seq_len, *d, embedding_dim).
+            is False, then the output will have shape (..., embedding_dim).
             Else, all dimensions except the first two will be collapsed into 
             the embedding dimension. 
         """
-        x = super().forward(x.long())
+
+        # pass the input through the embedding layers
+        x = torch.cat([
+            embedding_layer(x[..., i])
+            for i, embedding_layer in enumerate(self.embedding_layers)
+        ], dim = -1)
+
+        # apply batch normalisation if necessary
         if self.batchnorm is not None:
             x = self.batchnorm(x)
-        return x.view(x.shape[0], x.shape[1], -1)
+
+        return x
