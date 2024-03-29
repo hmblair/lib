@@ -270,9 +270,8 @@ class RecurrentClassiferDecoder(BareBonesRecurrentNetwork):
 class RecurrentEncoderDecoderWithAttention(nn.Module):
     def __init__(
             self,
-            num_embeddings : int,
-            embedding_dim : int,
-            hidden_size : int, 
+            num_embeddings : list[int],
+            embedding_dims : list[int],
             out_size : int,
             num_encoder_layers : int,
             num_decoder_layers : int,
@@ -287,22 +286,21 @@ class RecurrentEncoderDecoderWithAttention(nn.Module):
         # initialize the encoder
         self.encoder = RecurrentEncoder(
             num_embeddings = num_embeddings,
-            embedding_dim = embedding_dim,
-            hidden_size = hidden_size,
+            embedding_dims = embedding_dims,
             num_layers = num_encoder_layers,
             dropout = dropout,
             num_concat_dims = num_concat_dims,
             )
         # initialize the attention layer
         self.attention = MultiHeadSelfAttention(
-            embed_dim = hidden_size * 2,
+            embed_dim = self.encoder.hidden_size * 2,
             num_heads = num_heads,
             dropout = attention_dropout,
             )
         # initialize the decoder
         self.decoder = RecurrentDecoder(
-            in_size = hidden_size * 2,
-            hidden_size = hidden_size,
+            in_size = self.encoder.hidden_size * 2,
+            hidden_size = self.encoder.hidden_size,
             out_size = out_size,
             num_layers = num_decoder_layers,
             dropout = dropout,
