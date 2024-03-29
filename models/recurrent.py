@@ -16,9 +16,9 @@ class BareBonesRecurrentNetwork(nn.Module):
     in_size (int): 
         The number of input features.
     hidden_size (int):
-        The hidden size.
+        The hidden size of the LSTM.
     num_layers (int):
-        The number of layers.
+        The number of layers in the LSTM.
     dropout (float):
         The dropout rate.
     bidirectional (bool):
@@ -78,6 +78,8 @@ class BareBonesRecurrentNetwork(nn.Module):
         --------
         tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]: 
             The output tensor and a tuple containing the hidden and cell states.
+            The former is of shape (batch, seq_len, hidden_size * num_directions),
+            and the latter are of shape (num_layers * num_directions, batch, hidden_size).
         """
         return self.model(x, h)
     
@@ -100,16 +102,21 @@ class RecurrentEncoder(BareBonesRecurrentNetwork):
     """
     def __init__(
             self,
-            num_embeddings : int,
-            embedding_dim : int,
-            num_concat_dims : int = 1,
-            *args, **kwargs,
+            embedding_dims : list[int],
+            num_embeddings : list[int], 
+            *args : list, **kwargs : dict,
             ) -> None:
-        super().__init__(in_size = embedding_dim, *args, **kwargs)
+        
+        # the input size and hidden size of the LSTM are the sum of the embedding
+        # dimensions
+        super().__init__(
+            in_size=sum(embedding_dims), 
+            hidden_size=sum(embedding_dims),
+            *args, **kwargs,
+            )
         self.embedding = IntegerEmbedding(
             num_embeddings = num_embeddings, 
-            embedding_dim = embedding_dim,
-            num_concat_dims = num_concat_dims,
+            embedding_dims = embedding_dims,
             )
         
 
