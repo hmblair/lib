@@ -11,7 +11,7 @@ from pytorch_lightning.utilities import rank_zero_warn
 from .datasets import XarrayDataset
 from .utils import get_filename
 import xarray as xr
-from constants import NC_EXTENSION
+from .constants import NC_EXTENSION
 
 class BarebonesDataModule(pl.LightningDataModule, metaclass=ABCMeta):
     """

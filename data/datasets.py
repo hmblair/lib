@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr
 import torch
 from torch.utils.data import Dataset, IterableDataset
-from constants import NC_EXTENSION
+from .constants import NC_EXTENSION
 
 class SimpleDataset(Dataset):
     """
