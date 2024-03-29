@@ -306,6 +306,7 @@ class XarrayIterableDataset(IterableDataset):
             should_shuffle : bool = False,
             batch_dimension : str = 'batch',
             engine : str = 'h5netcdf',
+            transforms : list[callable] = [],
             ) -> None:
         
         # verify that at least one path is specified
