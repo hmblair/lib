@@ -8,6 +8,7 @@ import xarray as xr
 import torch
 from torch.utils.data import Dataset, IterableDataset
 from .constants import NC_EXTENSION
+import random
 
 class SimpleDataset(Dataset):
     """
@@ -374,6 +375,7 @@ class XarrayIterableDataset(IterableDataset):
             # shuffle the datasets if specified
             if self.should_shuffle:
                 self.shuffle()
+                random.shuffle(idx)
 
             # loop over the indices
             for path, ix in idx:
