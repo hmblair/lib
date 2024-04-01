@@ -133,7 +133,7 @@ class LogMSELoss(nn.Module):
         super().__init__()
         self.mse = nn.MSELoss()
     
-    def forward(self, x : torch.Tensor, y : torch.Tensor) -> torch.Tensor:
+    def forward(self, input : torch.Tensor, target : torch.Tensor) -> torch.Tensor:
         """
         Compute the logarithmic mean squared error between the given tensors.
 
@@ -149,7 +149,7 @@ class LogMSELoss(nn.Module):
         torch.Tensor:
             The logarithmic mean squared error between the given tensors.
         """
-        return self.mse(torch.log(x), torch.log(y))
+        return self.mse(torch.log(input), torch.log(target))
     
 
 class LogNormalLoss(nn.Module):
