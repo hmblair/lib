@@ -83,6 +83,13 @@ class IntegerEmbedding(nn.Module):
             the embedding dimension. 
         """
 
+        # convert to a long tensor
+        x = x.long()
+
+        # if there is only one embedding layer, then we need to add a dummy dimension
+        if len(self.embedding_dims) == 1:
+            x = x.unsqueeze(-1)
+
         # pass the input through the embedding layers
         x = torch.cat([
             embedding_layer(x[..., i])
